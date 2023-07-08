@@ -8,7 +8,11 @@ async function getContract(address: string) {
     if (!result.success) {
         throw new Error("Invalid address");
     }
-    return await client.getContractSourceCode(result.data);
+    const [sourceCode] = await client.getContractSourceCode(result.data);
+    return {
+        address,
+        ...sourceCode,
+    };
 }
 
 type ContractPageProps = {
@@ -16,7 +20,7 @@ type ContractPageProps = {
 };
 
 const Contract: Page<ContractPageProps> = async ({ params: { address } }) => {
-    const [contract] = await getContract(address);
+    const contract = await getContract(address);
 
     if (!contract) {
         return <main>Contract not found</main>;
@@ -45,12 +49,11 @@ const Contract: Page<ContractPageProps> = async ({ params: { address } }) => {
                 <p>Runs</p>
                 <p>{contract.optimizationRuns}</p>
             </div>
-
             <h2>Source Code</h2>
-            <pre>{contract.sourceCode}</pre>
+            <pre>{JSON.stringify(contract.sourceCode, null, 4)}</pre>
             <div>
                 <h2>ABI</h2>
-                <pre>{JSON.stringify(JSON.parse(contract.abi), null, 4)}</pre>
+                <pre>{JSON.stringify(JSON.parse(contract.abi ?? ""), null, 4)}</pre>
                 {contract.constructorArguments && (
                     <>
                         <h2>Constructor</h2>

@@ -25,24 +25,52 @@ export type Address = z.infer<typeof addressSchema>;
 
 type EndpointParams = { module: string; action: string } & Record<string, string>;
 
-const apiBoolean = z.enum(["0", "1"]).transform(value => value === "1");
-const apiOptionalString = z.string().transform(value => (value === "" ? undefined : value));
+export const enumBooleanSchema = z.enum(["0", "1"]).transform(value => value === "1");
+export const optionalStringSchema = z
+    .string()
+    .transform(value => (value === "" ? undefined : value));
+
+const MultiFileSourceCodeSchema = z
+    .string()
+    .refine(value => {
+        if (!value.startsWith("{") || !value.endsWith("}")) {
+            return false;
+        }
+        try {
+            JSON.parse(value.substring(1, value.length - 1));
+        } catch (e) {
+            return false;
+        }
+        return true;
+    })
+    .transform(value => JSON.parse(value.substring(1, value.length - 1)) as unknown)
+    .pipe(
+        z.object({
+            language: z.string(),
+            sources: z
+                .record(z.object({ content: z.string() }))
+                .transform(sources =>
+                    Object.entries(sources).map(([name, { content }]) => ({ name, content }))
+                ),
+            settings: z.object({}).passthrough().optional(),
+        })
+    );
 
 export const SourceCodeSchema = z
     .object({
-        SourceCode: z.string(),
+        SourceCode: MultiFileSourceCodeSchema.or(z.string()),
         ABI: z.string(),
         ContractName: z.string(),
         CompilerVersion: z.string(),
-        OptimizationUsed: apiBoolean,
+        OptimizationUsed: enumBooleanSchema,
         Runs: z.coerce.number(),
         ConstructorArguments: z.string(),
         EVMVersion: z.string(),
         Library: z.string(),
         LicenseType: z.string(),
-        Proxy: apiBoolean,
-        Implementation: apiOptionalString,
-        SwarmSource: apiOptionalString,
+        Proxy: enumBooleanSchema,
+        Implementation: optionalStringSchema,
+        SwarmSource: optionalStringSchema,
     })
     .transform(
         ({
@@ -102,18 +130,15 @@ export class EtherScanClient {
     }
 
     async getContractSourceCode(address: Address) {
-        const response = await this.callApi<unknown>({
+        const response = await this.callApi({
             module: "contract",
             action: "getsourcecode",
             address,
         });
-        console.log(response);
-        const result = z.array(SourceCodeResponseSchema).parse(response);
-        console.log(result);
-        return result;
+        return z.array(SourceCodeResponseSchema).parse(response);
     }
 
-    private callApi<T>(params: EndpointParams): Promise<T> {
+    private callApi<T = unknown>(params: EndpointParams): Promise<T> {
         const endPoint = this.encodeQueryParams({
             ...params,
             apikey: this.apiKey,
