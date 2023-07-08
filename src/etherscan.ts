@@ -23,12 +23,28 @@ export const addressSchema = z
     .transform(value => value.toLowerCase());
 export type Address = z.infer<typeof addressSchema>;
 
+export const etherSchema = z.string().transform(ethers.parseEther);
+export type Ether = z.infer<typeof etherSchema>;
+
 type EndpointParams = { module: string; action: string } & Record<string, string>;
 
 export const enumBooleanSchema = z.enum(["0", "1"]).transform(value => value === "1");
 export const optionalStringSchema = z
     .string()
     .transform(value => (value === "" ? undefined : value));
+
+const balanceOptionsSchema = z.object({
+    tag: z.enum(["latest", "earliest", "pending"]).optional().default("latest"),
+});
+export type BalanceOptions = z.infer<typeof balanceOptionsSchema>;
+
+const getBalancesSchema = addressSchema.or(z.array(addressSchema).max(20)).transform(value => {
+    if (Array.isArray(value)) {
+        return value;
+    }
+    return [value];
+});
+const getBalancesResultSchema = z.array(z.object({ account: addressSchema, balance: etherSchema }));
 
 const MultiFileSourceCodeSchema = z
     .string()
@@ -120,6 +136,29 @@ export class EtherScanClient {
         private readonly apiKey: string,
         private readonly apiUrl = "https://api.etherscan.io/api"
     ) {}
+
+    async getBalance(address: string, options?: BalanceOptions) {
+        const { tag } = balanceOptionsSchema.parse(options ?? {});
+        const balance = await this.callApi({
+            module: "account",
+            action: "balance",
+            address,
+            tag,
+        });
+        return etherSchema.parse(balance);
+    }
+
+    async getBalances(addresses: string[] | string, options?: BalanceOptions) {
+        const { tag } = balanceOptionsSchema.parse(options ?? {});
+        const address = getBalancesSchema.parse(addresses).join(",");
+        const result = await this.callApi({
+            module: "account",
+            action: "balancemulti",
+            address,
+            tag,
+        });
+        return getBalancesResultSchema.parse(result);
+    }
 
     async getABIForContract(address: Address) {
         return this.callApi<string>({
