@@ -331,6 +331,56 @@ const ContractCreation = z.object({
     contractCreator: Address,
 });
 
+const ContractExecutionStatus = z.object({
+    isError: EnumBoolean,
+    errDescription: OptionalString,
+});
+
+const TransactionReceiptStatus = z.object({
+    status: EnumBoolean,
+});
+
+const BlockAndUncleRewards = z.object({
+    blockNumber: Integer,
+    timeStamp: TimeStamp,
+    blockMiner: Address,
+    blockReward: BigInt,
+    uncles: z.array(
+        z
+            .object({
+                miner: Address,
+                unclePosition: Integer,
+                blockreward: BigInt,
+            })
+            .transform(({ blockreward, ...rest }) => ({ ...rest, blockReward: blockreward }))
+    ),
+    uncleInclusionReward: BigInt,
+});
+
+const EstimatedTimeToBlockNo = z
+    .object({
+        CurrentBlock: Integer,
+        CountdownBlock: Integer,
+        ReamingBlock: Integer,
+        EstimatedTimeInSec: z.number(),
+    })
+    .transform(
+        ({
+            CurrentBlock: currentBlock,
+            CountdownBlock: countdownBlock,
+            ReamingBlock: remainingBlock,
+            EstimatedTimeInSec: estimatedTime,
+        }) => ({
+            currentBlock,
+            countdownBlock,
+            remainingBlock,
+            estimatedTime,
+        })
+    );
+
+const ClosestOption = z.enum(["before", "after"]).default("before");
+type ClosestOption = z.infer<typeof ClosestOption>;
+
 export class EtherScanClient {
     constructor(
         private readonly apiKey: string,
@@ -525,6 +575,56 @@ export class EtherScanClient {
             contractAddresses,
         });
         return z.array(ContractCreation).parse(response);
+    }
+
+    async getContractExecutionStatus(txHash: string) {
+        const response = await this.callApi({
+            module: "transaction",
+            action: "getstatus",
+            txhash: txHash,
+        });
+        return ContractExecutionStatus.parse(response);
+    }
+
+    async getTransactionReceiptStatus(txHash: string) {
+        const response = await this.callApi({
+            module: "transaction",
+            action: "gettxreceiptstatus",
+            txhash: txHash,
+        });
+        return TransactionReceiptStatus.parse(response);
+    }
+
+    async getBlockAndUncleRewardsByBlockNumber(blockNumber: number) {
+        const blockno = Integer.min(0).parse(blockNumber).toString();
+        const response = await this.callApi({
+            module: "block",
+            action: "getblockreward",
+            blockno,
+        });
+        return BlockAndUncleRewards.parse(response);
+    }
+
+    async getEstimatedTimeToBlockNo(blockNumber: number) {
+        const blockno = Integer.min(0).parse(blockNumber).toString();
+        const response = await this.callApi({
+            module: "block",
+            action: "getblockcountdown",
+            blockno,
+        });
+        return EstimatedTimeToBlockNo.parse(response);
+    }
+
+    async getBlockNoByTimestamp(timestamp: number, closest?: ClosestOption) {
+        const timestampString = Integer.min(0).parse(timestamp).toString();
+        const closestString = ClosestOption.parse(closest);
+        const response = await this.callApi({
+            module: "block",
+            action: "getblocknobytime",
+            timestamp: timestampString,
+            closest: closestString,
+        });
+        return Integer.parse(response);
     }
 
     private callApi<T = unknown>(params: EndpointParams): Promise<T> {
