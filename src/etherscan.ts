@@ -317,6 +317,20 @@ const NotContract = z
 
 const ContractSourceCodeResponse = NotContract.or(ContractSourceCode);
 
+const GetContractCreationInput = Address.or(z.array(Address).min(1).max(5)).transform(addr => {
+    if (Array.isArray(addr)) {
+        return addr;
+    }
+    return [addr];
+});
+type GetContractCreationInput = z.infer<typeof GetContractCreationInput>;
+
+const ContractCreation = z.object({
+    contractAddress: Address,
+    txHash: HexValue,
+    contractCreator: Address,
+});
+
 export class EtherScanClient {
     constructor(
         private readonly apiKey: string,
@@ -501,6 +515,16 @@ export class EtherScanClient {
             address,
         });
         return z.array(ContractSourceCodeResponse).parse(response);
+    }
+
+    async getContractCreation(...addresses: Address[]) {
+        const contractAddresses = GetContractCreationInput.parse(addresses).join(",");
+        const response = await this.callApi({
+            module: "contract",
+            action: "getcontractcreation",
+            contractAddresses,
+        });
+        return z.array(ContractCreation).parse(response);
     }
 
     private callApi<T = unknown>(params: EndpointParams): Promise<T> {
