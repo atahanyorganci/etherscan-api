@@ -1,6 +1,66 @@
 import { ethers } from "ethers";
 import { z } from "zod";
 
+/**
+ * Boolean represented as a string `"0"` or `"1"`
+ */
+export const EnumBoolean = z.enum(["0", "1"]).transform(value => value === "1");
+
+/**
+ * Optional string represented as an empty string `""` or a non-empty string
+ */
+export const OptionalString = z.string().transform(value => (value === "" ? undefined : value));
+
+/**
+ * Address represented as a string with a `0x` prefix followed by 40 hexadecimal characters
+ * @example `"0x0000000000000000000000000000000000000000"`
+ * @example `"0xBf1345f1b27A711EB3128288db1783DB19027DA2"`
+ */
+export const Address = z
+    .string()
+    .refine(ethers.isAddress, {
+        message: "Invalid address",
+    })
+    .transform(value => value.toLowerCase());
+export type Address = z.infer<typeof Address>;
+
+/**
+ * Address represented as a string with a `0x` prefix followed by 40 hexadecimal characters or an empty string
+ */
+export const AddressOrEmpty = Address.or(z.string().refine(value => value === ""));
+
+/**
+ * Ether value with 18 decimal places represented as a string
+ * @example `"1.0"` is parsed as  `1000000000000000000n` wei
+ */
+export const Ether = z.string().transform(ethers.parseEther);
+export type Ether = z.infer<typeof Ether>;
+
+/**
+ * Hexadecimal value represented as a string with a `0x` prefix followed by an even number of hexadecimal characters
+ * if string is only `0x` then it is parsed as `undefined`
+ */
+export const HexValue = z
+    .string()
+    .refine(value => value.match(/^0x[0-9a-fA-F]*$/i))
+    .transform(value => (value.length === 2 ? undefined : value));
+export type HexValue = z.infer<typeof HexValue>;
+
+/**
+ * Unix timestamp represented as a number of seconds since the Unix epoch
+ */
+const TimeStamp = z.coerce.number().transform(value => new Date(value * 1000));
+
+/**
+ * Integer string represented as a string of digits
+ */
+const Integer = z.coerce.number().int();
+
+/**
+ * Big integer represented as a string of digits
+ */
+const BigInt = z.coerce.bigint();
+
 type SuccessResponse<T> = {
     status: "1";
     message: "OK";
@@ -14,189 +74,166 @@ type ErrorResponse = {
 };
 
 type Response<T> = SuccessResponse<T> | ErrorResponse;
-
-export const addressSchema = z
-    .string()
-    .refine(ethers.isAddress, {
-        message: "Invalid address",
-    })
-    .transform(value => value.toLowerCase());
-export type Address = z.infer<typeof addressSchema>;
-
-export const etherSchema = z.string().transform(ethers.parseEther);
-export type Ether = z.infer<typeof etherSchema>;
-
-export const hexEncodedValueSchema = z
-    .string()
-    .refine(value => value.match(/^0x[0-9a-fA-F]*$/i))
-    .transform(value => (value.length === 2 ? undefined : value));
-export type HexEncodedValue = z.infer<typeof hexEncodedValueSchema>;
-
 type EndpointParams = { module: string; action: string } & Record<string, string>;
 
-export const enumBooleanSchema = z.enum(["0", "1"]).transform(value => value === "1");
-export const optionalStringSchema = z
-    .string()
-    .transform(value => (value === "" ? undefined : value));
-
-const balanceOptionsSchema = z.object({
+const BalanceOptions = z.object({
     tag: z.enum(["latest", "earliest", "pending"]).optional().default("latest"),
 });
-export type BalanceOptions = z.infer<typeof balanceOptionsSchema>;
+export type BalanceOptions = z.infer<typeof BalanceOptions>;
 
-const getBalancesSchema = addressSchema.or(z.array(addressSchema).max(20)).transform(value => {
+const GetBalancesInput = Address.or(z.array(Address).max(20)).transform(value => {
     if (Array.isArray(value)) {
         return value;
     }
     return [value];
 });
-const getBalancesResultSchema = z.array(z.object({ account: addressSchema, balance: etherSchema }));
+const GetBalancesResult = z.array(z.object({ account: Address, balance: Ether }));
 
-const paginationSchema = z.object({
+const PaginationOptions = z.object({
     startBlock: z.number().int().min(0).optional().default(0),
     endBlock: z.number().int().min(0).optional().default(99999999),
     page: z.number().int().min(1).optional().default(1),
     offset: z.number().int().min(1).max(10000).optional().default(10),
     sort: z.enum(["asc", "desc"]).optional().default("desc"),
 });
-export type PaginationSchema = Partial<z.infer<typeof paginationSchema>>;
+export type PaginationOptions = Partial<z.infer<typeof PaginationOptions>>;
 
-const transactionSchema = z.object({
-    blockNumber: z.coerce.number(),
-    timeStamp: z.coerce.number().transform(value => new Date(value * 1000)),
+const Transaction = z.object({
+    blockNumber: Integer,
+    timeStamp: TimeStamp,
     hash: z.string(),
-    nonce: z.coerce.number(),
+    nonce: Integer,
     blockHash: z.string(),
-    transactionIndex: z.coerce.number(),
-    from: z.string(),
-    to: optionalStringSchema,
-    value: etherSchema,
-    gas: etherSchema,
-    gasPrice: etherSchema,
-    isError: enumBooleanSchema,
-    txreceipt_status: enumBooleanSchema,
-    input: hexEncodedValueSchema,
-    contractAddress: optionalStringSchema.or(addressSchema),
-    cumulativeGasUsed: etherSchema,
-    gasUsed: etherSchema,
-    confirmations: z.coerce.number(),
-    methodId: hexEncodedValueSchema,
-    functionName: optionalStringSchema,
+    transactionIndex: Integer,
+    from: Address,
+    to: AddressOrEmpty,
+    value: Ether,
+    gas: BigInt,
+    gasPrice: BigInt,
+    isError: EnumBoolean,
+    txreceipt_status: EnumBoolean,
+    input: HexValue,
+    contractAddress: AddressOrEmpty,
+    cumulativeGasUsed: BigInt,
+    gasUsed: BigInt,
+    confirmations: Integer,
+    methodId: HexValue,
+    functionName: OptionalString,
 });
-export type Transaction = z.infer<typeof transactionSchema>;
+export type Transaction = z.infer<typeof Transaction>;
 
-const internalTransactionSchema = z.object({
-    blockNumber: z.coerce.number(),
-    timeStamp: z.coerce.number().transform(value => new Date(value * 1000)),
+const InternalTransaction = z.object({
+    blockNumber: Integer,
+    timeStamp: TimeStamp,
     hash: z.string(),
-    from: z.string(),
-    to: optionalStringSchema.or(addressSchema),
-    value: etherSchema,
-    contractAddress: optionalStringSchema.or(addressSchema),
-    input: optionalStringSchema.or(hexEncodedValueSchema),
+    from: Address,
+    to: AddressOrEmpty,
+    value: Ether,
+    contractAddress: AddressOrEmpty,
+    input: OptionalString.or(HexValue),
     type: z.enum(["call", "create"]),
-    gas: etherSchema,
-    gasUsed: etherSchema,
+    gas: BigInt,
+    gasUsed: BigInt,
     traceId: z.string(),
-    isError: enumBooleanSchema,
-    errCode: optionalStringSchema,
+    isError: EnumBoolean,
+    errCode: OptionalString,
 });
 
-const internalTransactionByHashSchema = z.object({
-    blockNumber: z.coerce.number(),
-    timeStamp: z.coerce.number().transform(value => new Date(value * 1000)),
-    from: z.string(),
-    to: optionalStringSchema.or(addressSchema),
-    value: etherSchema,
-    contractAddress: optionalStringSchema.or(addressSchema),
-    input: optionalStringSchema.or(hexEncodedValueSchema),
+const InternalTransactionByHash = z.object({
+    blockNumber: Integer,
+    timeStamp: TimeStamp,
+    from: Address,
+    to: AddressOrEmpty,
+    value: Ether,
+    contractAddress: AddressOrEmpty,
+    input: OptionalString.or(HexValue),
     type: z.enum(["call", "create"]),
-    gas: etherSchema,
-    gasUsed: etherSchema,
-    isError: enumBooleanSchema,
-    errCode: optionalStringSchema,
+    gas: BigInt,
+    gasUsed: BigInt,
+    isError: EnumBoolean,
+    errCode: OptionalString,
 });
 
-const erc20TokenTransferSchema = z.object({
-    blockNumber: z.coerce.number(),
-    timeStamp: z.coerce.number().transform(value => new Date(value * 1000)),
+const ERC20TokenTransfer = z.object({
+    blockNumber: Integer,
+    timeStamp: TimeStamp,
     hash: z.string(),
-    nonce: z.coerce.number(),
+    nonce: Integer,
     blockHash: z.string(),
-    from: addressSchema,
-    contractAddress: addressSchema,
-    to: addressSchema,
-    value: etherSchema,
+    from: Address,
+    contractAddress: Address,
+    to: Address,
+    value: Ether,
     tokenName: z.string(),
     tokenSymbol: z.string(),
     tokenDecimal: z.coerce.number(),
-    transactionIndex: z.coerce.number(),
-    gas: etherSchema,
-    gasPrice: etherSchema,
-    gasUsed: etherSchema,
-    cumulativeGasUsed: etherSchema,
+    transactionIndex: Integer,
+    gas: BigInt,
+    gasPrice: BigInt,
+    gasUsed: BigInt,
+    cumulativeGasUsed: BigInt,
     input: z.string(),
-    confirmations: z.coerce.number(),
+    confirmations: Integer,
 });
 
-const erc721TokenTransferSchema = z.object({
-    blockNumber: z.coerce.number(),
-    timeStamp: z.coerce.number().transform(value => new Date(value * 1000)),
+const ERC721TokenTransfer = z.object({
+    blockNumber: Integer,
+    timeStamp: TimeStamp,
     hash: z.string(),
-    nonce: z.coerce.number(),
+    nonce: Integer,
     blockHash: z.string(),
-    from: addressSchema,
-    contractAddress: addressSchema,
-    to: addressSchema,
+    from: Address,
+    contractAddress: Address,
+    to: Address,
     tokenID: z.string(),
     tokenName: z.string(),
     tokenSymbol: z.string(),
     tokenDecimal: z.literal("0"),
-    transactionIndex: z.coerce.number(),
-    gas: etherSchema,
-    gasPrice: etherSchema,
-    gasUsed: etherSchema,
-    cumulativeGasUsed: etherSchema,
+    transactionIndex: Integer,
+    gas: BigInt,
+    gasPrice: BigInt,
+    gasUsed: BigInt,
+    cumulativeGasUsed: BigInt,
     input: z.string(),
-    confirmations: z.coerce.number(),
+    confirmations: Integer,
 });
 
-const erc1155TokenTransferSchema = z.object({
-    blockNumber: z.coerce.number().int(),
-    timeStamp: z.coerce.number().transform(value => new Date(value * 1000)),
+const ERC1155TokenTransfer = z.object({
+    blockNumber: Integer,
+    timeStamp: TimeStamp,
     hash: z.string(),
-    nonce: z.coerce.number(),
+    nonce: Integer,
     blockHash: z.string(),
-    transactionIndex: z.coerce.number(),
-    gas: z.coerce.bigint(),
-    gasPrice: z.coerce.bigint(),
-    gasUsed: z.coerce.bigint(),
-    cumulativeGasUsed: z.coerce.bigint(),
+    transactionIndex: Integer,
+    gas: BigInt,
+    gasPrice: BigInt,
+    gasUsed: BigInt,
+    cumulativeGasUsed: BigInt,
     input: z.string(),
-    contractAddress: z.string(),
-    from: z.string(),
-    to: z.string(),
+    contractAddress: Address,
+    from: Address,
+    to: Address,
     tokenID: z.string(),
-    tokenValue: etherSchema,
+    tokenValue: Ether,
     tokenName: z.string(),
     tokenSymbol: z.string(),
-    confirmations: z.coerce.number(),
+    confirmations: Integer,
 });
 
-const validatedBlockOptionsSchema = z.object({
+const GetValidatedBlockOptions = z.object({
     blockType: z.enum(["blocks", "uncles"]).default("blocks"),
     page: z.number().int().min(1).default(1),
     offset: z.number().int().min(1).max(10000).default(10),
 });
-export type ValidatedBlockOptions = Partial<z.infer<typeof validatedBlockOptionsSchema>>;
+export type GetValidatedBlockOptions = Partial<z.infer<typeof GetValidatedBlockOptions>>;
 
-const validatedBlockSchema = z.object({
-    blockNumber: z.coerce.number(),
-    timeStamp: z.coerce.number().transform(value => new Date(value * 1000)),
-    blockReward: z.coerce.bigint(),
+const ValidatedBlock = z.object({
+    blockNumber: Integer,
+    timeStamp: TimeStamp,
+    blockReward: BigInt,
 });
 
-const MultiFileSourceCodeSchema = z
+const MultiFileSourceCode = z
     .string()
     .refine(value => {
         if (!value.startsWith("{") || !value.endsWith("}")) {
@@ -222,21 +259,21 @@ const MultiFileSourceCodeSchema = z
         })
     );
 
-export const SourceCodeSchema = z
+export const ContractSourceCode = z
     .object({
-        SourceCode: MultiFileSourceCodeSchema.or(z.string()),
+        SourceCode: MultiFileSourceCode.or(z.string()),
         ABI: z.string(),
         ContractName: z.string(),
         CompilerVersion: z.string(),
-        OptimizationUsed: enumBooleanSchema,
+        OptimizationUsed: EnumBoolean,
         Runs: z.coerce.number(),
         ConstructorArguments: z.string(),
         EVMVersion: z.string(),
         Library: z.string(),
         LicenseType: z.string(),
-        Proxy: enumBooleanSchema,
-        Implementation: optionalStringSchema,
-        SwarmSource: optionalStringSchema,
+        Proxy: EnumBoolean,
+        Implementation: OptionalString,
+        SwarmSource: OptionalString,
     })
     .transform(
         ({
@@ -269,6 +306,7 @@ export const SourceCodeSchema = z
             swarmSource,
         })
     );
+export type ContractSourceCode = z.infer<typeof ContractSourceCode>;
 
 const NotContract = z
     .object({
@@ -277,9 +315,7 @@ const NotContract = z
     .refine(value => value.ABI === "Contract source code not verified")
     .transform(() => undefined);
 
-const SourceCodeResponseSchema = NotContract.or(SourceCodeSchema);
-
-export type ContractSourceCode = z.infer<typeof SourceCodeSchema>;
+const ContractSourceCodeResponse = NotContract.or(ContractSourceCode);
 
 export class EtherScanClient {
     constructor(
@@ -288,30 +324,30 @@ export class EtherScanClient {
     ) {}
 
     async getBalance(address: string, options?: BalanceOptions) {
-        const { tag } = balanceOptionsSchema.parse(options ?? {});
+        const { tag } = BalanceOptions.parse(options ?? {});
         const balance = await this.callApi({
             module: "account",
             action: "balance",
             address,
             tag,
         });
-        return etherSchema.parse(balance);
+        return Ether.parse(balance);
     }
 
     async getBalances(addresses: string[] | string, options?: BalanceOptions) {
-        const { tag } = balanceOptionsSchema.parse(options ?? {});
-        const address = getBalancesSchema.parse(addresses).join(",");
+        const { tag } = BalanceOptions.parse(options ?? {});
+        const address = GetBalancesInput.parse(addresses).join(",");
         const result = await this.callApi({
             module: "account",
             action: "balancemulti",
             address,
             tag,
         });
-        return getBalancesResultSchema.parse(result);
+        return GetBalancesResult.parse(result);
     }
 
-    async getTransactionsByAddress(address: string, options?: PaginationSchema) {
-        const { startBlock, endBlock, page, offset, sort } = paginationSchema.parse(options ?? {});
+    async getTransactionsByAddress(address: string, options?: PaginationOptions) {
+        const { startBlock, endBlock, page, offset, sort } = PaginationOptions.parse(options ?? {});
         const result = await this.callApi<unknown[]>({
             module: "account",
             action: "txlist",
@@ -322,11 +358,11 @@ export class EtherScanClient {
             offset: offset.toString(),
             sort: sort,
         });
-        return z.array(transactionSchema).parse(result);
+        return z.array(Transaction).parse(result);
     }
 
-    async getInternalTransactionsByAddress(address: string, options?: PaginationSchema) {
-        const { startBlock, endBlock, page, offset, sort } = paginationSchema.parse(options ?? {});
+    async getInternalTransactionsByAddress(address: string, options?: PaginationOptions) {
+        const { startBlock, endBlock, page, offset, sort } = PaginationOptions.parse(options ?? {});
         const result = await this.callApi({
             module: "account",
             action: "txlistinternal",
@@ -337,7 +373,7 @@ export class EtherScanClient {
             offset: offset.toString(),
             sort,
         });
-        return z.array(internalTransactionSchema).parse(result);
+        return z.array(InternalTransaction).parse(result);
     }
 
     async getInternalTransactionsByHash(txHash: string) {
@@ -346,15 +382,15 @@ export class EtherScanClient {
             action: "txlistinternal",
             txhash: txHash,
         });
-        return z.array(internalTransactionByHashSchema).parse(result);
+        return z.array(InternalTransactionByHash).parse(result);
     }
 
     async getTransactionsByBlockRange(
         start: number,
         end: number,
-        options?: Omit<PaginationSchema, "startBlock" | "endBlock">
+        options?: Omit<PaginationOptions, "startBlock" | "endBlock">
     ) {
-        const { startBlock, endBlock, offset, page, sort } = paginationSchema.parse({
+        const { startBlock, endBlock, offset, page, sort } = PaginationOptions.parse({
             startBlock: start,
             endBlock: end,
             ...options,
@@ -368,17 +404,17 @@ export class EtherScanClient {
             page: page.toString(),
             sort,
         });
-        return z.array(internalTransactionSchema).parse(result);
+        return z.array(InternalTransaction).parse(result);
     }
 
     async getERC20TokenTransfersByAddress(
         contractAddress: string,
         address: string,
-        options?: PaginationSchema
+        options?: PaginationOptions
     ) {
-        contractAddress = addressSchema.parse(contractAddress);
-        address = addressSchema.parse(address);
-        const { startBlock, endBlock, page, offset, sort } = paginationSchema.parse(options ?? {});
+        contractAddress = Address.parse(contractAddress);
+        address = Address.parse(address);
+        const { startBlock, endBlock, page, offset, sort } = PaginationOptions.parse(options ?? {});
         const result = await this.callApi({
             module: "account",
             action: "tokentx",
@@ -390,17 +426,17 @@ export class EtherScanClient {
             offset: offset.toString(),
             sort,
         });
-        return z.array(erc20TokenTransferSchema).parse(result);
+        return z.array(ERC20TokenTransfer).parse(result);
     }
 
     async getERC721TokenTransfersByAddress(
         contractAddress: string,
         address: string,
-        options?: PaginationSchema
+        options?: PaginationOptions
     ) {
-        contractAddress = addressSchema.parse(contractAddress);
-        address = addressSchema.parse(address);
-        const { startBlock, endBlock, page, offset, sort } = paginationSchema.parse(options ?? {});
+        contractAddress = Address.parse(contractAddress);
+        address = Address.parse(address);
+        const { startBlock, endBlock, page, offset, sort } = PaginationOptions.parse(options ?? {});
         const result = await this.callApi({
             module: "account",
             action: "tokennfttx",
@@ -412,17 +448,17 @@ export class EtherScanClient {
             offset: offset.toString(),
             sort,
         });
-        return z.array(erc721TokenTransferSchema).parse(result);
+        return z.array(ERC721TokenTransfer).parse(result);
     }
 
     async getERC1155TokenTransfersByAddress(
         contractAddress: string,
         address: string,
-        options?: PaginationSchema
+        options?: PaginationOptions
     ) {
-        contractAddress = addressSchema.parse(contractAddress);
-        address = addressSchema.parse(address);
-        const { startBlock, endBlock, page, offset, sort } = paginationSchema.parse(options ?? {});
+        contractAddress = Address.parse(contractAddress);
+        address = Address.parse(address);
+        const { startBlock, endBlock, page, offset, sort } = PaginationOptions.parse(options ?? {});
         const result = await this.callApi({
             module: "account",
             action: "token1155tx",
@@ -434,11 +470,11 @@ export class EtherScanClient {
             offset: offset.toString(),
             sort,
         });
-        return z.array(erc1155TokenTransferSchema).parse(result);
+        return z.array(ERC1155TokenTransfer).parse(result);
     }
 
-    async getBlocksValidatedByAddress(address: string, options?: ValidatedBlockOptions) {
-        const { blockType, page, offset } = validatedBlockOptionsSchema.parse(options ?? {});
+    async getBlocksValidatedByAddress(address: string, options?: GetValidatedBlockOptions) {
+        const { blockType, page, offset } = GetValidatedBlockOptions.parse(options ?? {});
         const result = await this.callApi({
             module: "account",
             action: "getminedblocks",
@@ -447,7 +483,7 @@ export class EtherScanClient {
             page: page.toString(),
             offset: offset.toString(),
         });
-        return z.array(validatedBlockSchema).parse(result);
+        return z.array(ValidatedBlock).parse(result);
     }
 
     async getABIForContract(address: Address) {
@@ -464,7 +500,7 @@ export class EtherScanClient {
             action: "getsourcecode",
             address,
         });
-        return z.array(SourceCodeResponseSchema).parse(response);
+        return z.array(ContractSourceCodeResponse).parse(response);
     }
 
     private callApi<T = unknown>(params: EndpointParams): Promise<T> {
