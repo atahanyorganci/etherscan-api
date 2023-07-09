@@ -47,6 +47,12 @@ export const HexValue = z
 export type HexValue = z.infer<typeof HexValue>;
 
 /**
+ * Hexadecimal string represented as a string with a `0x` prefix followed by an even number of hexadecimal characters
+ */
+export const HexString = z.string().refine(value => value.match(/^0x[0-9a-fA-F]*$/i));
+export type HexString = z.infer<typeof HexString>;
+
+/**
  * Unix timestamp represented as a number of seconds since the Unix epoch
  */
 const TimeStamp = z.coerce.number().transform(value => new Date(value * 1000));
@@ -90,13 +96,21 @@ const GetBalancesInput = Address.or(z.array(Address).max(20)).transform(value =>
 const GetBalancesResult = z.array(z.object({ account: Address, balance: Ether }));
 
 const PaginationOptions = z.object({
-    startBlock: z.number().int().min(0).optional().default(0),
-    endBlock: z.number().int().min(0).optional().default(99999999),
-    page: z.number().int().min(1).optional().default(1),
-    offset: z.number().int().min(1).max(10000).optional().default(10),
-    sort: z.enum(["asc", "desc"]).optional().default("desc"),
+    startBlock: Integer.min(0).default(0),
+    endBlock: Integer.min(0).default(99999999),
+    page: Integer.min(1).default(1),
+    offset: Integer.min(1).max(10000).default(10),
+    sort: z.enum(["asc", "desc"]).default("desc"),
 });
 export type PaginationOptions = Partial<z.infer<typeof PaginationOptions>>;
+
+const LogPaginationOptions = z.object({
+    fromBlock: Integer.min(0).default(0),
+    toBlock: Integer.min(0).default(99999999),
+    page: Integer.min(1).default(1),
+    offset: Integer.min(1).max(10000).default(10),
+});
+export type LogPaginationOptions = Partial<z.infer<typeof LogPaginationOptions>>;
 
 const Transaction = z.object({
     blockNumber: Integer,
@@ -381,6 +395,45 @@ const EstimatedTimeToBlockNo = z
 const ClosestOption = z.enum(["before", "after"]).default("before");
 type ClosestOption = z.infer<typeof ClosestOption>;
 
+const EventLog = z.object({
+    address: Address,
+    topics: z.array(HexString),
+    data: HexValue,
+    blockNumber: Integer,
+    timeStamp: TimeStamp,
+    gasPrice: BigInt,
+    gasUsed: BigInt,
+    logIndex: HexValue,
+    transactionHash: HexValue,
+    transactionIndex: HexValue,
+});
+
+const Operator = z.enum(["and", "or"]);
+export type Operator = z.infer<typeof Operator>;
+
+const Topics = z
+    .object({
+        topic0: HexString,
+    })
+    .or(
+        z
+            .object({
+                topic0: HexString,
+                topic1: HexString,
+                operator01: Operator,
+            })
+            .transform(({ operator01, ...rest }) => ({ ...rest, topic0_1_opr: operator01 }))
+    );
+export type Topics =
+    | {
+          topic0: HexString;
+      }
+    | {
+          topic0: HexString;
+          topic1: HexString;
+          operator01: Operator;
+      };
+
 export class EtherScanClient {
     constructor(
         private readonly apiKey: string,
@@ -625,6 +678,57 @@ export class EtherScanClient {
             closest: closestString,
         });
         return Integer.parse(response);
+    }
+
+    async getEventLogsByAddress(address: Address, options?: LogPaginationOptions) {
+        address = Address.parse(address);
+        const { fromBlock, toBlock, page, offset } = LogPaginationOptions.parse(options ?? {});
+        const response = await this.callApi({
+            module: "logs",
+            action: "getlogs",
+            address,
+            fromBlock: fromBlock.toString(),
+            toBlock: toBlock.toString(),
+            page: page.toString(),
+            offset: offset.toString(),
+        });
+        return z.array(EventLog).parse(response);
+    }
+
+    async getEventLogsByTopics(topics: Topics, options?: LogPaginationOptions) {
+        topics = Topics.parse(topics);
+        const { fromBlock, toBlock, page, offset } = LogPaginationOptions.parse(options ?? {});
+        const response = await this.callApi({
+            module: "logs",
+            action: "getLogs",
+            fromBlock: fromBlock.toString(),
+            toBlock: toBlock.toString(),
+            page: page.toString(),
+            offset: offset.toString(),
+            ...topics,
+        });
+        return z.array(EventLog).parse(response);
+    }
+
+    async getEventLogsByAddressFilteredByTopics(
+        address: Address,
+        topics: Topics,
+        options?: LogPaginationOptions
+    ) {
+        address = Address.parse(address);
+        topics = Topics.parse(topics);
+        const { fromBlock, toBlock, page, offset } = LogPaginationOptions.parse(options ?? {});
+        const response = await this.callApi({
+            module: "logs",
+            action: "getLogs",
+            address,
+            fromBlock: fromBlock.toString(),
+            toBlock: toBlock.toString(),
+            page: page.toString(),
+            offset: offset.toString(),
+            ...topics,
+        });
+        return z.array(EventLog).parse(response);
     }
 
     private callApi<T = unknown>(params: EndpointParams): Promise<T> {
