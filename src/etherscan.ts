@@ -434,6 +434,92 @@ export type Topics =
           operator01: Operator;
       };
 
+const Ether2Supply = z
+    .object({
+        EthSupply: Ether,
+        Eth2Supply: Ether,
+        BurntFees: Ether,
+        WithdrawnTotal: Ether,
+    })
+    .transform(
+        ({
+            EthSupply: etherSupply,
+            Eth2Supply: ether2Supply,
+            BurntFees: burntFees,
+            WithdrawnTotal: withdrawnTotal,
+        }) => ({
+            etherSupply,
+            ether2Supply,
+            burntFees,
+            withdrawnTotal,
+        })
+    );
+
+const EtherPrice = z
+    .object({
+        ethbtc: Ether,
+        ethbtc_timestamp: TimeStamp,
+        ethusd: Ether,
+        ethusd_timestamp: TimeStamp,
+    })
+    .transform(
+        ({
+            ethbtc: eth2btc,
+            ethbtc_timestamp: eth2btcTimeStamp,
+            ethusd: eth2usd,
+            ethusd_timestamp: eth2usdTimeStamp,
+        }) => ({
+            eth2btc,
+            eth2btcTimeStamp,
+            eth2usd,
+            eth2usdTimeStamp,
+        })
+    );
+
+const DateString = z
+    .string()
+    .refine(data => data.match(/^\d{4}-\d{2}-\d{2}$/))
+    .or(z.date().transform(date => date.toISOString().split("T")[0]));
+
+const GetEthereumNodeSizeOptions = z.object({
+    startDate: DateString,
+    endDate: DateString,
+    clientType: z.enum(["geth", "parity"]).default("geth"),
+    syncMode: z.enum(["default", "archive"]).default("default"),
+    sort: z.enum(["asc", "desc"]).default("asc"),
+});
+type GetEthereumNodeSizeOptions = {
+    startDate: string;
+    endDate: string;
+    clientType?: "geth" | "parity";
+    syncMode?: "default" | "archive";
+    sort?: "asc" | "desc";
+};
+
+const EthereumNodeSize = z.object({
+    blockNumber: Integer,
+    chainTimeStamp: z
+        .string()
+        .refine(data => data.match(/^\d{4}-\d{2}-\d{2}$/))
+        .transform(date => new Date(date)),
+    chainSize: Integer,
+    clientType: z.enum(["Geth", "Parity"]),
+    syncMode: z.enum(["Default", "Archive"]),
+});
+
+const NodeCount = z
+    .object({
+        UTCDate: z
+            .string()
+            .refine(data => data.match(/^\d{4}-\d{2}-\d{2}$/))
+            .transform(date => new Date(date)),
+        TotalNodeCount: Integer,
+    })
+    .transform(({ UTCDate: date, TotalNodeCount: nodeCount }) => ({
+        date,
+        nodeCount,
+    }));
+
 export class EtherScanClient {
     constructor(
         private readonly apiKey: string,
@@ -729,6 +815,64 @@ export class EtherScanClient {
             ...topics,
         });
         return z.array(EventLog).parse(response);
+    }
+
+    async getEtherSupply() {
+        const response = await this.callApi({
+            module: "stats",
+            action: "ethsupply",
+        });
+        return Ether.parse(response);
+    }
+
+    async getEther2Supply() {
+        const response = await this.callApi({
+            module: "stats",
+            action: "ethsupply2",
+        });
+        return Ether2Supply.parse(response);
+    }
+
+    async getLastEtherPrice() {
+        const response = await this.callApi({
+            module: "stats",
+            action: "ethprice",
+        });
+        return EtherPrice.parse(response);
+    }
+
+    async getEthereumNodeSize(options: GetEthereumNodeSizeOptions) {
+        const { startDate, endDate, clientType, sort, syncMode } =
+            GetEthereumNodeSizeOptions.parse(options);
+        const response = await this.callApi({
+            module: "stats",
+            action: "chainsize",
+            startdate: startDate,
+            enddate: endDate,
+            clienttype: clientType,
+            sort,
+            syncmode: syncMode,
+        });
+        const nodeSizes = z.array(EthereumNodeSize).parse(response);
+        return {
+            clientType,
+            syncMode,
+            nodeSizes: nodeSizes.map(
+                ({ blockNumber: blockNo, chainSize, chainTimeStamp: timeStamp }) => ({
+                    blockNo,
+                    chainSize,
+                    timeStamp,
+                })
+            ),
+        };
+    }
+
+    async getNodeCount() {
+        const response = await this.callApi({
+            module: "stats",
+            action: "nodecount",
+        });
+        return NodeCount.parse(response);
     }
 
     private callApi<T = unknown>(params: EndpointParams): Promise<T> {
