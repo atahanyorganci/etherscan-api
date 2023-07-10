@@ -668,13 +668,13 @@ export class EtherScanClient {
         return EstimatedTimeToBlockNo.parse(response);
     }
 
-    async getBlockNoByTimestamp(timestamp: number, closest?: ClosestOption) {
-        const timestampString = Integer.min(0).parse(timestamp).toString();
+    async getBlockNoByTimestamp(timeStamp: number, closest?: ClosestOption) {
+        const timeStampString = Integer.min(0).parse(timeStamp).toString();
         const closestString = ClosestOption.parse(closest);
         const response = await this.callApi({
             module: "block",
             action: "getblocknobytime",
-            timestamp: timestampString,
+            timestamp: timeStampString,
             closest: closestString,
         });
         return Integer.parse(response);
