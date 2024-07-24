@@ -1,3 +1,4 @@
+import { ofetch } from "ofetch";
 import { getAddress, InvalidAddressError, parseEther } from "viem";
 import { z } from "zod";
 
@@ -1011,8 +1012,8 @@ export class EtherScanClient {
 
 	private async callApi(params: EndpointParams): Promise<unknown> {
 		const endPoint = this.encodeQueryParams(params);
-		const response = await fetch(endPoint);
-		const apiResponse = Response.parse(await response.json());
+		const response = await ofetch(endPoint);
+		const apiResponse = Response.parse(response);
 		if (apiResponse.status === "0") {
 			throw new Error(apiResponse.message);
 		}
@@ -1024,8 +1025,8 @@ export class EtherScanClient {
 			module: "proxy",
 			...params,
 		});
-		const response = await fetch(endPoint);
-		const jsonRpcResponse = JsonRpcResponse.parse(await response.json());
+		const response = await ofetch(endPoint);
+		const jsonRpcResponse = JsonRpcResponse.parse(response);
 		if (!jsonRpcResponse.ok) {
 			throw new Error(jsonRpcResponse.error.message);
 		}
