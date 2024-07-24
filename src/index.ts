@@ -2,6 +2,8 @@ import { ofetch } from "ofetch";
 import { getAddress, InvalidAddressError, parseEther } from "viem";
 import { z } from "zod";
 
+type Primitive = boolean | string | number | undefined | null;
+
 /**
  * Boolean represented as a string `"0"` or `"1"`
  */
@@ -89,10 +91,7 @@ const ErrorResponse = z.object({
 const Response = z.discriminatedUnion("status", [SuccessResponse, ErrorResponse]);
 type Response = z.infer<typeof Response>;
 
-type EndpointParams = { module: string; action: string } & Record<
-	string,
-	string | number | boolean
->;
+type EndpointParams = { module: string; action: string } & Record<string, Primitive>;
 
 const BalanceOptions = z.object({
 	tag: z.enum(["latest", "earliest", "pending"]).optional(),
@@ -1001,10 +1000,13 @@ export class EtherScanClient {
 		return NodeCount.parse(response);
 	}
 
-	private encodeQueryParams(params: Record<string, string | number | boolean>): URL {
+	private encodeQueryParams(params: Record<string, Primitive>) {
 		const url = new URL(this.apiUrl);
 		url.searchParams.set("apikey", this.apiKey);
 		for (const [key, value] of Object.entries(params)) {
+			if (value === undefined || value === null) {
+				continue;
+			}
 			url.searchParams.set(key, value.toString());
 		}
 		return url;
