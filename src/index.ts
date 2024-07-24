@@ -1,7 +1,28 @@
 import { ofetch } from "ofetch";
 import type { Storage } from "unstorage";
-import { getAddress, InvalidAddressError, parseEther } from "viem";
 import { z } from "zod";
+import {
+	Erc20Transfer,
+	Erc721Transfer,
+	Erc1155Transfer,
+	GetBalancesInput,
+	GetBalancesResult,
+	GetTokenTransfersInput,
+	GetValidatedBlockOptions,
+	ValidatedBlock,
+} from "./account";
+import {
+	Address,
+	BigInt_,
+	BlockTagEnum,
+	Ether,
+	HexString,
+	HexValue,
+	Integer,
+	OptionalAddress,
+	OptionalString,
+	TimeStamp,
+} from "./core";
 
 type Primitive = boolean | string | number | undefined | null;
 
@@ -9,73 +30,6 @@ type Primitive = boolean | string | number | undefined | null;
  * Boolean represented as a string `"0"` or `"1"`
  */
 export const EnumBoolean = z.enum(["0", "1"]).transform(value => value === "1");
-
-/**
- * Optional string represented as an empty string `""` or a non-empty string
- */
-export const OptionalString = z.string().transform(value => (value === "" ? undefined : value));
-
-/**
- * Address hex-strings `0x` prefix followed by 40 hexadecimal characters
- */
-export const Address = z.string().transform((value, ctx) => {
-	try {
-		return getAddress(value);
-	} catch (error) {
-		if (error instanceof InvalidAddressError) {
-			ctx.addIssue({
-				code: z.ZodIssueCode.custom,
-				message: error.message,
-			});
-		}
-		return z.NEVER;
-	}
-});
-
-/**
- * Address represented as a string with a `0x` prefix followed by 40 hexadecimal characters or an empty string
- */
-export const OptionalAddress = Address.or(OptionalString);
-
-/**
- * Ether value with 18 decimal places represented as a string
- *
- * @example `"1.0"` is parsed as  `1000000000000000000n` wei
- */
-export const Ether = z.string().transform(ether => parseEther(ether));
-export type Ether = z.infer<typeof Ether>;
-
-/**
- * Hexadecimal value represented as a string with a `0x` prefix followed by an even number of hexadecimal characters
- * if string is only `0x` then it is parsed as `undefined`
- */
-export const HexValue = z
-	.string()
-	.refine(value => value.match(/^0x[0-9a-fA-F]*$/i))
-	.transform(value => (value.length === 2 ? undefined : value));
-export type HexValue = z.infer<typeof HexValue>;
-
-/**
- * Hexadecimal string represented as a string with a `0x` prefix followed by an even number of hexadecimal characters
- */
-export const HexString = z.string().refine(value => value.match(/^0x[0-9a-fA-F]*$/i));
-export type HexString = z.infer<typeof HexString>;
-
-/**
- * Unix timestamp represented as a number of seconds since the Unix epoch
- */
-const TimeStamp = z.coerce.number().transform(value => new Date(value * 1000));
-
-/**
- * Integer string represented as a string of digits
- */
-const Integer = z.coerce.number().int();
-
-/**
- * Big integer represented as a string of digits
- */
-// biome-ignore lint/suspicious/noShadowRestrictedNames: this symbol isn't exported and connivent
-const BigInt = z.coerce.bigint();
 
 const SuccessResponse = z.object({
 	status: z.literal("1"),
@@ -86,7 +40,7 @@ const SuccessResponse = z.object({
 const ErrorResponse = z.object({
 	status: z.literal("0"),
 	message: z.string(),
-	result: z.string(),
+	result: z.unknown(),
 });
 
 const Response = z.discriminatedUnion("status", [SuccessResponse, ErrorResponse]);
@@ -94,27 +48,28 @@ type Response = z.infer<typeof Response>;
 
 type EndpointParams = { module: string; action: string } & Record<string, Primitive>;
 
-const BalanceOptions = z.object({
-	tag: z.enum(["latest", "earliest", "pending"]).optional(),
-});
-export type BalanceOptions = z.infer<typeof BalanceOptions>;
-
-const GetBalancesInput = Address.or(z.array(Address).max(20)).transform(value => {
-	if (Array.isArray(value)) {
-		return value;
-	}
-	return [value];
-});
-const GetBalancesResult = z.array(z.object({ account: Address, balance: Ether }));
-
-const PaginationOptions = z.object({
+export const PaginationOptions = z.object({
 	startBlock: Integer.min(0).optional(),
 	endBlock: Integer.min(0).optional(),
 	page: Integer.min(1).optional(),
 	offset: Integer.min(1).max(10000).optional(),
 	sort: z.enum(["asc", "desc"]).optional(),
 });
+/**
+ * - `startBlock` - block number to start searching for transactions
+ * - `endBlock` - block number to stop searching for transactions
+ * - `page` - page number, if pagination is enabled
+ * - `offset` - the number of transactions displayed per page
+ * - `sort` - the sorting preference, use asc to sort by ascending and desc to sort by descending
+ *
+ * Tip: Specify a smaller startblock and endblock range for faster search results.
+ */
 export type PaginationOptions = Partial<z.infer<typeof PaginationOptions>>;
+
+function ensurePaginationOptions(options: PaginationOptions) {
+	const { startBlock, endBlock, page, offset, sort } = options;
+	return { startblock: startBlock, endblock: endBlock, page, offset, sort };
+}
 
 const LogPaginationOptions = z.object({
 	fromBlock: Integer.min(0).optional(),
@@ -134,14 +89,14 @@ const Transaction = z.object({
 	from: Address,
 	to: OptionalAddress,
 	value: Ether,
-	gas: BigInt,
-	gasPrice: BigInt,
+	gas: BigInt_,
+	gasPrice: BigInt_,
 	isError: EnumBoolean,
 	txreceipt_status: EnumBoolean,
 	input: HexValue,
 	contractAddress: OptionalAddress,
-	cumulativeGasUsed: BigInt,
-	gasUsed: BigInt,
+	cumulativeGasUsed: BigInt_,
+	gasUsed: BigInt_,
 	confirmations: Integer,
 	methodId: HexValue,
 	functionName: OptionalString,
@@ -158,8 +113,8 @@ const InternalTransaction = z.object({
 	contractAddress: OptionalAddress,
 	input: OptionalString.or(HexValue),
 	type: z.enum(["call", "create"]),
-	gas: BigInt,
-	gasUsed: BigInt,
+	gas: BigInt_,
+	gasUsed: BigInt_,
 	traceId: z.string(),
 	isError: EnumBoolean,
 	errCode: OptionalString,
@@ -172,91 +127,12 @@ const InternalTransactionByHash = z.object({
 	to: OptionalAddress,
 	value: Ether,
 	contractAddress: OptionalAddress,
-	input: OptionalString.or(HexValue),
+	input: HexValue.or(OptionalString),
 	type: z.enum(["call", "create"]),
-	gas: BigInt,
-	gasUsed: BigInt,
+	gas: BigInt_,
+	gasUsed: BigInt_,
 	isError: EnumBoolean,
 	errCode: OptionalString,
-});
-
-const ERC20TokenTransfer = z.object({
-	blockNumber: Integer,
-	timeStamp: TimeStamp,
-	hash: z.string(),
-	nonce: Integer,
-	blockHash: z.string(),
-	from: Address,
-	contractAddress: Address,
-	to: Address,
-	value: Ether,
-	tokenName: z.string(),
-	tokenSymbol: z.string(),
-	tokenDecimal: z.coerce.number(),
-	transactionIndex: Integer,
-	gas: BigInt,
-	gasPrice: BigInt,
-	gasUsed: BigInt,
-	cumulativeGasUsed: BigInt,
-	input: z.string(),
-	confirmations: Integer,
-});
-
-const ERC721TokenTransfer = z.object({
-	blockNumber: Integer,
-	timeStamp: TimeStamp,
-	hash: z.string(),
-	nonce: Integer,
-	blockHash: z.string(),
-	from: Address,
-	contractAddress: Address,
-	to: Address,
-	tokenID: z.string(),
-	tokenName: z.string(),
-	tokenSymbol: z.string(),
-	tokenDecimal: z.literal("0"),
-	transactionIndex: Integer,
-	gas: BigInt,
-	gasPrice: BigInt,
-	gasUsed: BigInt,
-	cumulativeGasUsed: BigInt,
-	input: z.string(),
-	confirmations: Integer,
-});
-
-const ERC1155TokenTransfer = z.object({
-	blockNumber: Integer,
-	timeStamp: TimeStamp,
-	hash: z.string(),
-	nonce: Integer,
-	blockHash: z.string(),
-	transactionIndex: Integer,
-	gas: BigInt,
-	gasPrice: BigInt,
-	gasUsed: BigInt,
-	cumulativeGasUsed: BigInt,
-	input: z.string(),
-	contractAddress: Address,
-	from: Address,
-	to: Address,
-	tokenID: z.string(),
-	tokenValue: Ether,
-	tokenName: z.string(),
-	tokenSymbol: z.string(),
-	confirmations: Integer,
-});
-
-const GetValidatedBlockOptions = z.object({
-	blockType: z.enum(["blocks", "uncles"]).default("blocks"),
-	page: z.number().int().min(1).default(1),
-	offset: z.number().int().min(1).max(10000).default(10),
-});
-export type GetValidatedBlockOptions = Partial<z.infer<typeof GetValidatedBlockOptions>>;
-
-const ValidatedBlock = z.object({
-	blockNumber: Integer,
-	timeStamp: TimeStamp,
-	blockReward: BigInt,
 });
 
 const MultiFileSourceCode = z
@@ -370,17 +246,17 @@ const BlockAndUncleRewards = z.object({
 	blockNumber: Integer,
 	timeStamp: TimeStamp,
 	blockMiner: Address,
-	blockReward: BigInt,
+	blockReward: BigInt_,
 	uncles: z.array(
 		z
 			.object({
 				miner: Address,
 				unclePosition: Integer,
-				blockreward: BigInt,
+				blockreward: BigInt_,
 			})
 			.transform(({ blockreward, ...rest }) => ({ ...rest, blockReward: blockreward })),
 	),
-	uncleInclusionReward: BigInt,
+	uncleInclusionReward: BigInt_,
 });
 
 const EstimatedTimeToBlockNo = z
@@ -413,8 +289,8 @@ const EventLog = z.object({
 	data: HexValue,
 	blockNumber: Integer,
 	timeStamp: TimeStamp,
-	gasPrice: BigInt,
-	gasUsed: BigInt,
+	gasPrice: BigInt_,
+	gasUsed: BigInt_,
 	logIndex: HexValue,
 	transactionHash: HexValue,
 	transactionIndex: HexValue,
@@ -543,23 +419,15 @@ const JsonRpcResponseError = z
 export const JsonRpcResponse = JsonRpcResponseOk.or(JsonRpcResponseError);
 export type JsonRpcResponse = z.infer<typeof JsonRpcResponse>;
 
-const BlockTagEnum = z.union([
-	z.literal("earliest"),
-	z.literal("finalized"),
-	z.literal("safe"),
-	z.literal("latest"),
-]);
-type BlockTagEnum = z.infer<typeof BlockTagEnum>;
-
 const BlockTag = BlockTagEnum.or(Integer.min(0).transform(data => `0x${data.toString(16)}`));
 export type BlockTag = BlockTagEnum | number;
 
 export const Block = z
 	.object({
-		difficulty: BigInt,
+		difficulty: BigInt_,
 		extraData: HexString,
-		gasLimit: BigInt,
-		gasUsed: BigInt,
+		gasLimit: BigInt_,
+		gasUsed: BigInt_,
 		hash: HexString,
 		logsBloom: HexString,
 		miner: Address,
@@ -572,7 +440,7 @@ export const Block = z
 		size: Integer,
 		stateRoot: HexString,
 		timestamp: TimeStamp,
-		totalDifficulty: BigInt,
+		totalDifficulty: BigInt_,
 		transactions: z.array(z.string()),
 		transactionsRoot: HexString,
 		uncles: z.array(HexString),
@@ -581,12 +449,12 @@ export const Block = z
 
 const SignedLegacyTransaction = z.object({
 	type: z.literal("0x0"),
-	nonce: BigInt,
+	nonce: BigInt_,
 	to: Address.or(z.null()),
-	gas: BigInt,
-	value: BigInt,
+	gas: BigInt_,
+	value: BigInt_,
 	input: HexString,
-	gasPrice: BigInt,
+	gasPrice: BigInt_,
 	chainId: Integer,
 	v: HexValue,
 	r: HexValue,
@@ -638,10 +506,10 @@ const Signed1559Transaction = z.object({
 
 export const BlockWithTransactions = z
 	.object({
-		difficulty: BigInt,
+		difficulty: BigInt_,
 		extraData: HexString,
-		gasLimit: BigInt,
-		gasUsed: BigInt,
+		gasLimit: BigInt_,
+		gasUsed: BigInt_,
 		hash: HexString,
 		logsBloom: HexString,
 		miner: Address,
@@ -654,7 +522,7 @@ export const BlockWithTransactions = z
 		size: Integer,
 		stateRoot: HexString,
 		timestamp: TimeStamp,
-		totalDifficulty: BigInt,
+		totalDifficulty: BigInt_,
 		transactions: z.array(
 			SignedLegacyTransaction.or(Signed2930Transaction).or(Signed1559Transaction),
 		),
@@ -710,123 +578,179 @@ export class Client {
 		}
 	}
 
-	async getBalance(address: string, options: BalanceOptions = {}) {
+	/**
+	 * Returns the Ether balance of a given address.
+	 *
+	 * @param address address to check for balance
+	 * @param tag pre-defined block parameter, either `"finalized"`, `"earliest"`, `"pending"` or `"latest"`
+	 * @returns balance in wei
+	 *
+	 * @see {@link https://docs.etherscan.io/api-endpoints/accounts#get-ether-balance-for-a-single-address | Etherscan API docs}
+	 */
+	async getBalance(address: string, tag?: BlockTagEnum) {
 		const balance = await this.callApi({
 			module: "account",
 			action: "balance",
-			address,
-			...BalanceOptions.parse(options),
+			address: Address.parse(address),
+			tag: BlockTagEnum.optional().parse(tag),
 		});
 		return Ether.parse(balance);
 	}
 
-	async getBalances(addresses: string[] | string, options: BalanceOptions = {}) {
-		const address = GetBalancesInput.parse(addresses).join(",");
+	/**
+	 * Returns the balance of the accounts from a list of addresses.
+	 *
+	 * @param addresses  addresses to check for balance, up to **20 addresses** per call
+	 * @param tag block tag
+	 * @returns balances in wei
+	 *
+	 * @see {@link https://docs.etherscan.io/api-endpoints/accounts#get-ether-balance-for-multiple-addresses-in-a-single-call | Etherscan API docs}
+	 */
+	async getBalances(addresses: string[], tag?: BlockTagEnum) {
 		const result = await this.callApi({
 			module: "account",
 			action: "balancemulti",
-			address,
-			...BalanceOptions.parse(options),
+			address: GetBalancesInput.parse(addresses).join(","),
+			tag: BlockTagEnum.optional().parse(tag),
 		});
 		return GetBalancesResult.parse(result);
 	}
 
-	async getTransactionsByAddress(address: string, options: PaginationOptions = {}) {
+	/**
+	 * Returns the list of transactions performed by an address, with optional pagination.
+	 *
+	 * @param address address to list transactions for
+	 * @param options pagination options {@link PaginationOptions `PaginationOptions`}
+	 * @returns list of transactions
+	 *
+	 * @see {@link https://docs.etherscan.io/api-endpoints/accounts#get-a-list-of-normal-transactions-by-address | Etherscan API docs}
+	 */
+	async getTransactions(address: string, options: PaginationOptions = {}) {
 		const result = await this.callApi({
 			module: "account",
 			action: "txlist",
-			address,
-			...PaginationOptions.parse(options),
+			address: Address.parse(address),
+			...ensurePaginationOptions(options),
 		});
 		return z.array(Transaction).parse(result);
 	}
 
-	async getInternalTransactionsByAddress(address: string, options: PaginationOptions = {}) {
+	/**
+	 * Returns the list of transactions performed by an address, with optional pagination.
+	 *
+	 * @param address address to list transactions for
+	 * @param options pagination options {@link PaginationOptions `PaginationOptions`}
+	 * @returns list of internal transactions
+	 *
+	 * @see {@link https://docs.etherscan.io/api-endpoints/accounts#get-a-list-of-normal-transactions-by-address | Etherscan API docs}
+	 */
+	async getInternalTransactions(address: string, options: PaginationOptions = {}) {
 		const result = await this.callApi({
 			module: "account",
 			action: "txlistinternal",
-			address,
-			...PaginationOptions.parse(options),
+			address: Address.parse(address),
+			...ensurePaginationOptions(options),
 		});
 		return z.array(InternalTransaction).parse(result);
 	}
 
-	async getInternalTransactionsByHash(txHash: string) {
+	/**
+	 * Returns the list of internal transactions performed within a transaction.
+	 *
+	 * @param hash hash to check for internal transactions
+	 * @returns list of internal transactions
+	 *
+	 * @see {@link https://docs.etherscan.io/api-endpoints/accounts#get-internal-transactions-by-transaction-hash | Etherscan API docs}
+	 */
+	async getInternalTransactionByTransaction(hash: string) {
 		const result = await this.callApi({
 			module: "account",
 			action: "txlistinternal",
-			txhash: HexString.parse(txHash),
+			txhash: HexString.parse(hash),
 		});
 		return z.array(InternalTransactionByHash).parse(result);
 	}
 
-	async getTransactionsByBlockRange(
-		startBlock: number,
-		endBlock: number,
-		options?: Omit<PaginationOptions, "startBlock" | "endBlock">,
-	) {
-		const result = await this.callApi({
-			module: "account",
-			action: "txlistinternal",
-			...PaginationOptions.parse({
-				startBlock: Integer.min(0).parse(startBlock),
-				endBlock: Integer.min(0).parse(endBlock),
-				...options,
-			}),
-		});
-		return z.array(InternalTransaction).parse(result);
-	}
-
-	async getERC20TokenTransfersByAddress(
-		contractAddress: string,
-		address: string,
-		options: PaginationOptions = {},
-	) {
+	/**
+	 * Returns the list of ERC-20 tokens transferred by an address, with optional filtering by token contract.
+	 *
+	 * @param input specify `address` for filter based on account, specify `contractAddress` to filter by
+	 * ERC20 token, specify both to filter by account and ERC20 token
+	 * @param options pagination options {@link PaginationOptions `PaginationOptions`}
+	 * @returns list of {@link Erc20Transfer `Erc20Transfer`}s
+	 *
+	 * @see {@link https://docs.etherscan.io/api-endpoints/accounts#get-a-list-of-erc20-token-transfer-events-by-address | Etherscan API docs}
+	 */
+	async getErc20Transfers(input: GetTokenTransfersInput, options: PaginationOptions = {}) {
+		const { address, contractAddress } = GetTokenTransfersInput.parse(input);
 		const result = await this.callApi({
 			module: "account",
 			action: "tokentx",
-			contractAddress: Address.parse(contractAddress),
-			address: Address.parse(address),
-			...PaginationOptions.parse(options),
+			address,
+			contractaddress: contractAddress,
+			...ensurePaginationOptions(options),
 		});
-		return z.array(ERC20TokenTransfer).parse(result);
+		return z.array(Erc20Transfer).parse(result);
 	}
 
-	async getERC721TokenTransfersByAddress(
-		contractAddress: string,
-		address: string,
-		options: PaginationOptions = {},
-	) {
+	/**
+	 * Returns the list of ERC-721 tokens transferred by an address, with optional filtering by token contract.
+	 *
+	 * @param input specify `address` for filter based on account, specify `contractAddress` to filter by
+	 * ERC721 token, specify both to filter by account and ERC721 token
+	 * @param options pagination options {@link PaginationOptions `PaginationOptions`}
+	 * @returns list of {@link Erc721Transfer `Erc721Transfer`}s
+	 *
+	 * @see {@link https://docs.etherscan.io/api-endpoints/accounts#get-a-list-of-erc721-token-transfer-events-by-address | Etherscan API docs}
+	 */
+	async getErc721Transfers(input: GetTokenTransfersInput, options: PaginationOptions = {}) {
+		const { address, contractAddress } = GetTokenTransfersInput.parse(input);
 		const result = await this.callApi({
 			module: "account",
 			action: "tokennfttx",
-			contractAddress: Address.parse(contractAddress),
-			address: Address.parse(address),
-			...PaginationOptions.parse(options),
+			address,
+			contractaddress: contractAddress,
+			...ensurePaginationOptions(options),
 		});
-		return z.array(ERC721TokenTransfer).parse(result);
+		return z.array(Erc721Transfer).parse(result);
 	}
 
-	async getERC1155TokenTransfersByAddress(
-		contractAddress: string,
-		address: string,
-		options: PaginationOptions = {},
-	) {
+	/**
+	 * Returns the list of ERC-1155 tokens transferred by an address, with optional filtering by token contract.
+	 *
+	 * @param input specify `address` for filter based on account, specify `contractAddress` to filter by
+	 * ERC1155 token, specify both to filter by account and ERC1155 token
+	 * @param options pagination options {@link PaginationOptions `PaginationOptions`}
+	 * @returns list of {@link Erc1155Transfer `Erc1155Transfer`}s
+	 *
+	 * @see {@link https://docs.etherscan.io/api-endpoints/accounts#get-a-list-of-erc1155-token-transfer-events-by-address | Etherscan API docs}
+	 */
+	async getErc1155Transfers(input: GetTokenTransfersInput, options: PaginationOptions = {}) {
+		const { address, contractAddress } = GetTokenTransfersInput.parse(input);
 		const result = await this.callApi({
 			module: "account",
 			action: "token1155tx",
-			contractAddress: Address.parse(contractAddress),
-			address: Address.parse(address),
-			...PaginationOptions.parse(options),
+			address,
+			contractaddress: contractAddress,
+			...ensurePaginationOptions(options),
 		});
-		return z.array(ERC1155TokenTransfer).parse(result);
+		return z.array(Erc1155Transfer).parse(result);
 	}
 
+	/**
+	 * Returns the list of blocks validated by an address.
+	 *
+	 * @param address validator address
+	 * @param options {@link GetValidatedBlockOptions `GetValidatedBlockOptions`}
+	 * @returns array of {@link ValidatedBlock `ValidatedBlock`}
+	 *
+	 * @see {@link https://docs.etherscan.io/api-endpoints/accounts#get-list-of-blocks-validated-by-address Etherscan API docs}
+	 */
 	async getBlocksValidatedByAddress(address: string, options: GetValidatedBlockOptions = {}) {
 		const result = await this.callApi({
 			module: "account",
 			action: "getminedblocks",
-			address,
+			address: Address.parse(address),
 			...GetValidatedBlockOptions.parse(options),
 		});
 		return z.array(ValidatedBlock).parse(result);
