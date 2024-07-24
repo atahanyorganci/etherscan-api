@@ -20,6 +20,6 @@
 		"module": "preserve",
 		"noEmit": true,
 		// No DOM.
-		"lib": ["es2022"]
+		"lib": ["ESNext"]
 	}
 }

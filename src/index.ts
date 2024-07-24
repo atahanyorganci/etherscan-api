@@ -1,4 +1,4 @@
-import { ethers } from "ethers";
+import { getAddress, InvalidAddressError, parseEther } from "viem";
 import { z } from "zod";
 
 /**
@@ -12,28 +12,33 @@ export const EnumBoolean = z.enum(["0", "1"]).transform(value => value === "1");
 export const OptionalString = z.string().transform(value => (value === "" ? undefined : value));
 
 /**
- * Address represented as a string with a `0x` prefix followed by 40 hexadecimal characters
- * @example `"0x0000000000000000000000000000000000000000"`
- * @example `"0xBf1345f1b27A711EB3128288db1783DB19027DA2"`
+ * Address hex-strings `0x` prefix followed by 40 hexadecimal characters
  */
-export const Address = z
-	.string()
-	.refine(ethers.isAddress, {
-		message: "Invalid address",
-	})
-	.transform(value => value.toLowerCase());
-export type Address = z.infer<typeof Address>;
+export const Address = z.string().transform((value, ctx) => {
+	try {
+		return getAddress(value);
+	} catch (error) {
+		if (error instanceof InvalidAddressError) {
+			ctx.addIssue({
+				code: z.ZodIssueCode.custom,
+				message: error.message,
+			});
+		}
+		return z.NEVER;
+	}
+});
 
 /**
  * Address represented as a string with a `0x` prefix followed by 40 hexadecimal characters or an empty string
  */
-export const AddressOrEmpty = Address.or(z.string().refine(value => value === ""));
+export const OptionalAddress = Address.or(OptionalString);
 
 /**
  * Ether value with 18 decimal places represented as a string
+ *
  * @example `"1.0"` is parsed as  `1000000000000000000n` wei
  */
-export const Ether = z.string().transform(ethers.parseEther);
+export const Ether = z.string().transform(ether => parseEther(ether));
 export type Ether = z.infer<typeof Ether>;
 
 /**
@@ -798,7 +803,7 @@ export class EtherScanClient {
 		return z.array(ValidatedBlock).parse(result);
 	}
 
-	async getABIForContract(address: Address) {
+	async getABIForContract(address: string) {
 		const result = await this.callApi({
 			module: "contract",
 			action: "getabi",
@@ -807,7 +812,7 @@ export class EtherScanClient {
 		return HexString.parse(result);
 	}
 
-	async getContractSourceCode(address: Address) {
+	async getContractSourceCode(address: string) {
 		const response = await this.callApi({
 			module: "contract",
 			action: "getsourcecode",
@@ -816,7 +821,7 @@ export class EtherScanClient {
 		return z.array(ContractSourceCodeResponse).parse(response);
 	}
 
-	async getContractCreation(addresses: Address[]) {
+	async getContractCreation(addresses: string[]) {
 		const contractAddresses = GetContractCreationInput.parse(addresses).join(",");
 		const response = await this.callApi({
 			module: "contract",
@@ -873,7 +878,7 @@ export class EtherScanClient {
 		return Integer.parse(response);
 	}
 
-	async getEventLogsByAddress(address: Address, options: LogPaginationOptions = {}) {
+	async getEventLogsByAddress(address: string, options: LogPaginationOptions = {}) {
 		const response = await this.callApi({
 			module: "logs",
 			action: "getlogs",
@@ -894,7 +899,7 @@ export class EtherScanClient {
 	}
 
 	async getEventLogsByAddressFilteredByTopics(
-		address: Address,
+		address: string,
 		topics: Topics,
 		options: LogPaginationOptions = {},
 	) {

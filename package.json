@@ -11,7 +11,7 @@
 		"lint:write": "biome check --write ."
 	},
 	"dependencies": {
-		"ethers": "^6.6.2",
+		"viem": "^2.18.0",
 		"zod": "^3.21.4"
 	},
 	"devDependencies": {
