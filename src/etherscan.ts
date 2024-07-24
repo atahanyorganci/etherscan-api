@@ -536,6 +536,126 @@ const JsonRpcResponseError = z
 export const JsonRpcResponse = JsonRpcResponseOk.or(JsonRpcResponseError);
 export type JsonRpcResponse = z.infer<typeof JsonRpcResponse>;
 
+const BlockTagEnum = z.union([
+    z.literal("earliest"),
+    z.literal("finalized"),
+    z.literal("safe"),
+    z.literal("latest"),
+]);
+type BlockTagEnum = z.infer<typeof BlockTagEnum>;
+
+const BlockTag = BlockTagEnum.or(Integer.min(0).transform(data => `0x${data.toString(16)}`));
+export type BlockTag = BlockTagEnum | number;
+
+export const Block = z
+    .object({
+        difficulty: BigInt,
+        extraData: HexString,
+        gasLimit: BigInt,
+        gasUsed: BigInt,
+        hash: HexString,
+        logsBloom: HexString,
+        miner: Address,
+        mixHash: HexString,
+        nonce: HexString,
+        number: Integer,
+        parentHash: HexString,
+        receiptsRoot: HexString,
+        sha3Uncles: HexString,
+        size: Integer,
+        stateRoot: HexString,
+        timestamp: TimeStamp,
+        totalDifficulty: BigInt,
+        transactions: z.array(z.string()),
+        transactionsRoot: HexString,
+        uncles: z.array(HexString),
+    })
+    .or(z.null());
+
+const SignedLegacyTransaction = z.object({
+    type: z.literal("0x0"),
+    nonce: BigInt,
+    to: Address.or(z.null()),
+    gas: BigInt,
+    value: BigInt,
+    input: HexString,
+    gasPrice: BigInt,
+    chainId: Integer,
+    v: HexValue,
+    r: HexValue,
+    s: HexValue,
+});
+
+const Signed2930Transaction = z.object({
+    type: z.literal(1),
+    chainId: Integer,
+    nonce: HexString,
+    gasPrice: HexString,
+    gasLimit: HexString,
+    to: AddressOrEmpty,
+    value: Ether,
+    data: HexString.optional(),
+    accessList: z.array(
+        z.object({
+            address: Address,
+            storageKeys: z.array(HexString),
+        })
+    ),
+    v: HexValue,
+    r: HexValue,
+    s: HexValue,
+});
+
+const Signed1559Transaction = z.object({
+    type: z.literal("0x2"),
+    nonce: HexString,
+    gasLimit: HexString,
+    to: AddressOrEmpty,
+    maxPriorityFeePerGas: HexString,
+    maxFeePerGas: HexString,
+    value: Ether,
+    data: HexString.optional(),
+    accessList: z
+        .array(
+            z.object({
+                address: Address,
+                storageKeys: z.array(HexString),
+            })
+        )
+        .optional(),
+    chainId: Integer,
+    v: HexValue,
+    r: HexValue,
+    s: HexValue,
+});
+
+export const BlockWithTransactions = z
+    .object({
+        difficulty: BigInt,
+        extraData: HexString,
+        gasLimit: BigInt,
+        gasUsed: BigInt,
+        hash: HexString,
+        logsBloom: HexString,
+        miner: Address,
+        mixHash: HexString,
+        nonce: HexString,
+        number: Integer,
+        parentHash: HexString,
+        receiptsRoot: HexString,
+        sha3Uncles: HexString,
+        size: Integer,
+        stateRoot: HexString,
+        timestamp: TimeStamp,
+        totalDifficulty: BigInt,
+        transactions: z.array(
+            SignedLegacyTransaction.or(Signed2930Transaction).or(Signed1559Transaction)
+        ),
+        transactionsRoot: HexString,
+        uncles: z.array(HexString),
+    })
+    .or(z.null());
+
 const NodeCount = z
     .object({
         UTCDate: z
@@ -844,6 +964,35 @@ export class EtherScanClient {
             ...topics,
         });
         return z.array(EventLog).parse(response);
+    }
+
+    async getBlockNumber() {
+        const response = await this.callJsonRpc({
+            action: "eth_blockNumber",
+        });
+        return Integer.parse(response);
+    }
+
+    async getBlockByNumber(blockTag: BlockTag) {
+        const tag = BlockTag.parse(blockTag);
+        const response = await this.callJsonRpc({
+            module: "proxy",
+            action: "eth_getBlockByNumber",
+            tag,
+            boolean: "false",
+        });
+        return Block.parse(response);
+    }
+
+    async getBlockByNumberWithTransactions(blockTag: BlockTag) {
+        const tag = BlockTag.parse(blockTag);
+        const response = await this.callJsonRpc({
+            module: "proxy",
+            action: "eth_getBlockByNumber",
+            tag,
+            boolean: "true",
+        });
+        return BlockWithTransactions.parse(response);
     }
 
     async getEtherSupply() {
