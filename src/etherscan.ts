@@ -88,7 +88,7 @@ type EndpointParams = { module: string; action: string } & Record<
 >;
 
 const BalanceOptions = z.object({
-    tag: z.enum(["latest", "earliest", "pending"]).optional().default("latest"),
+    tag: z.enum(["latest", "earliest", "pending"]).optional(),
 });
 export type BalanceOptions = z.infer<typeof BalanceOptions>;
 
@@ -101,19 +101,19 @@ const GetBalancesInput = Address.or(z.array(Address).max(20)).transform(value =>
 const GetBalancesResult = z.array(z.object({ account: Address, balance: Ether }));
 
 const PaginationOptions = z.object({
-    startBlock: Integer.min(0).default(0),
-    endBlock: Integer.min(0).default(99999999),
-    page: Integer.min(1).default(1),
-    offset: Integer.min(1).max(10000).default(10),
-    sort: z.enum(["asc", "desc"]).default("desc"),
+    startBlock: Integer.min(0).optional(),
+    endBlock: Integer.min(0).optional(),
+    page: Integer.min(1).optional(),
+    offset: Integer.min(1).max(10000).optional(),
+    sort: z.enum(["asc", "desc"]).optional(),
 });
 export type PaginationOptions = Partial<z.infer<typeof PaginationOptions>>;
 
 const LogPaginationOptions = z.object({
-    fromBlock: Integer.min(0).default(0),
-    toBlock: Integer.min(0).default(99999999),
-    page: Integer.min(1).default(1),
-    offset: Integer.min(1).max(10000).default(10),
+    fromBlock: Integer.min(0).optional(),
+    toBlock: Integer.min(0).optional(),
+    page: Integer.min(1).optional(),
+    offset: Integer.min(1).max(10000).optional(),
 });
 export type LogPaginationOptions = Partial<z.infer<typeof LogPaginationOptions>>;
 
@@ -675,55 +675,43 @@ export class EtherScanClient {
         private readonly apiUrl = "https://api.etherscan.io/api"
     ) {}
 
-    async getBalance(address: string, options?: BalanceOptions) {
-        const { tag } = BalanceOptions.parse(options ?? {});
+    async getBalance(address: string, options: BalanceOptions = {}) {
         const balance = await this.callApi({
             module: "account",
             action: "balance",
             address,
-            tag,
+            ...BalanceOptions.parse(options),
         });
         return Ether.parse(balance);
     }
 
-    async getBalances(addresses: string[] | string, options?: BalanceOptions) {
-        const { tag } = BalanceOptions.parse(options ?? {});
+    async getBalances(addresses: string[] | string, options: BalanceOptions = {}) {
         const address = GetBalancesInput.parse(addresses).join(",");
         const result = await this.callApi({
             module: "account",
             action: "balancemulti",
             address,
-            tag,
+            ...BalanceOptions.parse(options),
         });
         return GetBalancesResult.parse(result);
     }
 
-    async getTransactionsByAddress(address: string, options?: PaginationOptions) {
-        const { startBlock, endBlock, page, offset, sort } = PaginationOptions.parse(options ?? {});
-        const result = await this.callApi<unknown[]>({
+    async getTransactionsByAddress(address: string, options: PaginationOptions = {}) {
+        const result = await this.callApi({
             module: "account",
             action: "txlist",
             address,
-            startblock: startBlock.toString(),
-            endblock: endBlock.toString(),
-            page: page.toString(),
-            offset: offset.toString(),
-            sort: sort,
+            ...PaginationOptions.parse(options),
         });
         return z.array(Transaction).parse(result);
     }
 
-    async getInternalTransactionsByAddress(address: string, options?: PaginationOptions) {
-        const { startBlock, endBlock, page, offset, sort } = PaginationOptions.parse(options ?? {});
+    async getInternalTransactionsByAddress(address: string, options: PaginationOptions = {}) {
         const result = await this.callApi({
             module: "account",
             action: "txlistinternal",
             address,
-            startblock: startBlock.toString(),
-            endblock: endBlock.toString(),
-            page: page.toString(),
-            offset: offset.toString(),
-            sort,
+            ...PaginationOptions.parse(options),
         });
         return z.array(InternalTransaction).parse(result);
     }
@@ -732,29 +720,24 @@ export class EtherScanClient {
         const result = await this.callApi({
             module: "account",
             action: "txlistinternal",
-            txhash: txHash,
+            txhash: HexString.parse(txHash),
         });
         return z.array(InternalTransactionByHash).parse(result);
     }
 
     async getTransactionsByBlockRange(
-        start: number,
-        end: number,
+        startBlock: number,
+        endBlock: number,
         options?: Omit<PaginationOptions, "startBlock" | "endBlock">
     ) {
-        const { startBlock, endBlock, offset, page, sort } = PaginationOptions.parse({
-            startBlock: start,
-            endBlock: end,
-            ...options,
-        });
         const result = await this.callApi({
             module: "account",
             action: "txlistinternal",
-            startblock: startBlock.toString(),
-            endblock: endBlock.toString(),
-            offset: offset.toString(),
-            page: page.toString(),
-            sort,
+            ...PaginationOptions.parse({
+                startBlock: Integer.min(0).parse(startBlock),
+                endBlock: Integer.min(0).parse(endBlock),
+                ...options,
+            }),
         });
         return z.array(InternalTransaction).parse(result);
     }
@@ -762,21 +745,14 @@ export class EtherScanClient {
     async getERC20TokenTransfersByAddress(
         contractAddress: string,
         address: string,
-        options?: PaginationOptions
+        options: PaginationOptions = {}
     ) {
-        contractAddress = Address.parse(contractAddress);
-        address = Address.parse(address);
-        const { startBlock, endBlock, page, offset, sort } = PaginationOptions.parse(options ?? {});
         const result = await this.callApi({
             module: "account",
             action: "tokentx",
-            contractAddress,
-            address,
-            startblock: startBlock.toString(),
-            endblock: endBlock.toString(),
-            page: page.toString(),
-            offset: offset.toString(),
-            sort,
+            contractAddress: Address.parse(contractAddress),
+            address: Address.parse(address),
+            ...PaginationOptions.parse(options),
         });
         return z.array(ERC20TokenTransfer).parse(result);
     }
@@ -784,21 +760,14 @@ export class EtherScanClient {
     async getERC721TokenTransfersByAddress(
         contractAddress: string,
         address: string,
-        options?: PaginationOptions
+        options: PaginationOptions = {}
     ) {
-        contractAddress = Address.parse(contractAddress);
-        address = Address.parse(address);
-        const { startBlock, endBlock, page, offset, sort } = PaginationOptions.parse(options ?? {});
         const result = await this.callApi({
             module: "account",
             action: "tokennfttx",
-            contractAddress,
-            address,
-            startblock: startBlock.toString(),
-            endblock: endBlock.toString(),
-            page: page.toString(),
-            offset: offset.toString(),
-            sort,
+            contractAddress: Address.parse(contractAddress),
+            address: Address.parse(address),
+            ...PaginationOptions.parse(options),
         });
         return z.array(ERC721TokenTransfer).parse(result);
     }
@@ -806,56 +775,47 @@ export class EtherScanClient {
     async getERC1155TokenTransfersByAddress(
         contractAddress: string,
         address: string,
-        options?: PaginationOptions
+        options: PaginationOptions = {}
     ) {
-        contractAddress = Address.parse(contractAddress);
-        address = Address.parse(address);
-        const { startBlock, endBlock, page, offset, sort } = PaginationOptions.parse(options ?? {});
         const result = await this.callApi({
             module: "account",
             action: "token1155tx",
-            contractAddress,
-            address,
-            startblock: startBlock.toString(),
-            endblock: endBlock.toString(),
-            page: page.toString(),
-            offset: offset.toString(),
-            sort,
+            contractAddress: Address.parse(contractAddress),
+            address: Address.parse(address),
+            ...PaginationOptions.parse(options),
         });
         return z.array(ERC1155TokenTransfer).parse(result);
     }
 
-    async getBlocksValidatedByAddress(address: string, options?: GetValidatedBlockOptions) {
-        const { blockType, page, offset } = GetValidatedBlockOptions.parse(options ?? {});
+    async getBlocksValidatedByAddress(address: string, options: GetValidatedBlockOptions = {}) {
         const result = await this.callApi({
             module: "account",
             action: "getminedblocks",
             address,
-            blocktype: blockType,
-            page: page.toString(),
-            offset: offset.toString(),
+            ...GetValidatedBlockOptions.parse(options),
         });
         return z.array(ValidatedBlock).parse(result);
     }
 
     async getABIForContract(address: Address) {
-        return this.callApi<string>({
+        const result = await this.callApi({
             module: "contract",
             action: "getabi",
-            address,
+            address: Address.parse(address),
         });
+        return HexString.parse(result);
     }
 
     async getContractSourceCode(address: Address) {
         const response = await this.callApi({
             module: "contract",
             action: "getsourcecode",
-            address,
+            address: Address.parse(address),
         });
         return z.array(ContractSourceCodeResponse).parse(response);
     }
 
-    async getContractCreation(...addresses: Address[]) {
+    async getContractCreation(addresses: Address[]) {
         const contractAddresses = GetContractCreationInput.parse(addresses).join(",");
         const response = await this.callApi({
             module: "contract",
@@ -865,82 +825,69 @@ export class EtherScanClient {
         return z.array(ContractCreation).parse(response);
     }
 
-    async getContractExecutionStatus(txHash: string) {
+    async getContractExecutionStatus(hash: string) {
         const response = await this.callApi({
             module: "transaction",
             action: "getstatus",
-            txhash: txHash,
+            txhash: HexString.parse(hash),
         });
         return ContractExecutionStatus.parse(response);
     }
 
-    async getTransactionReceiptStatus(txHash: string) {
+    async getTransactionReceiptStatus(hash: string) {
         const response = await this.callApi({
             module: "transaction",
             action: "gettxreceiptstatus",
-            txhash: txHash,
+            txhash: HexString.parse(hash),
         });
         return TransactionReceiptStatus.parse(response);
     }
 
     async getBlockAndUncleRewardsByBlockNumber(blockNumber: number) {
-        const blockno = Integer.min(0).parse(blockNumber).toString();
         const response = await this.callApi({
             module: "block",
             action: "getblockreward",
-            blockno,
+            blockno: Integer.min(0).parse(blockNumber).toString(),
         });
         return BlockAndUncleRewards.parse(response);
     }
 
     async getEstimatedTimeToBlockNo(blockNumber: number) {
-        const blockno = Integer.min(0).parse(blockNumber).toString();
         const response = await this.callApi({
             module: "block",
             action: "getblockcountdown",
-            blockno,
+            blockno: Integer.min(0).parse(blockNumber).toString(),
         });
         return EstimatedTimeToBlockNo.parse(response);
     }
 
-    async getBlockNoByTimestamp(timeStamp: number, closest?: ClosestOption) {
-        const timeStampString = Integer.min(0).parse(timeStamp).toString();
+    async getBlockNoByTimestamp(timestamp: number, closest?: ClosestOption) {
         const closestString = ClosestOption.parse(closest);
         const response = await this.callApi({
             module: "block",
             action: "getblocknobytime",
-            timestamp: timeStampString,
+            timestamp: Integer.min(0).parse(timestamp).toString(),
             closest: closestString,
         });
         return Integer.parse(response);
     }
 
-    async getEventLogsByAddress(address: Address, options?: LogPaginationOptions) {
-        address = Address.parse(address);
-        const { fromBlock, toBlock, page, offset } = LogPaginationOptions.parse(options ?? {});
+    async getEventLogsByAddress(address: Address, options: LogPaginationOptions = {}) {
         const response = await this.callApi({
             module: "logs",
             action: "getlogs",
-            address,
-            fromBlock: fromBlock.toString(),
-            toBlock: toBlock.toString(),
-            page: page.toString(),
-            offset: offset.toString(),
+            address: Address.parse(address),
+            ...LogPaginationOptions.parse(options),
         });
         return z.array(EventLog).parse(response);
     }
 
-    async getEventLogsByTopics(topics: Topics, options?: LogPaginationOptions) {
-        topics = Topics.parse(topics);
-        const { fromBlock, toBlock, page, offset } = LogPaginationOptions.parse(options ?? {});
+    async getEventLogsByTopics(topics: Topics, options: LogPaginationOptions = {}) {
         const response = await this.callApi({
             module: "logs",
             action: "getLogs",
-            fromBlock: fromBlock.toString(),
-            toBlock: toBlock.toString(),
-            page: page.toString(),
-            offset: offset.toString(),
-            ...topics,
+            ...Topics.parse(topics),
+            ...LogPaginationOptions.parse(options),
         });
         return z.array(EventLog).parse(response);
     }
@@ -948,20 +895,14 @@ export class EtherScanClient {
     async getEventLogsByAddressFilteredByTopics(
         address: Address,
         topics: Topics,
-        options?: LogPaginationOptions
+        options: LogPaginationOptions = {}
     ) {
-        address = Address.parse(address);
-        topics = Topics.parse(topics);
-        const { fromBlock, toBlock, page, offset } = LogPaginationOptions.parse(options ?? {});
         const response = await this.callApi({
             module: "logs",
             action: "getLogs",
-            address,
-            fromBlock: fromBlock.toString(),
-            toBlock: toBlock.toString(),
-            page: page.toString(),
-            offset: offset.toString(),
-            ...topics,
+            address: Address.parse(address),
+            ...Topics.parse(topics),
+            ...LogPaginationOptions.parse(options),
         });
         return z.array(EventLog).parse(response);
     }
