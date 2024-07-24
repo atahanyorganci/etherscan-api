@@ -67,20 +67,25 @@ const Integer = z.coerce.number().int();
  */
 const BigInt = z.coerce.bigint();
 
-type SuccessResponse<T> = {
-    status: "1";
-    message: "OK";
-    result: T;
-};
+const SuccessResponse = z.object({
+    status: z.literal("1"),
+    message: z.string(),
+    result: z.unknown(),
+});
 
-type ErrorResponse = {
-    status: "0";
-    message: "NOTOK";
-    result: string;
-};
+const ErrorResponse = z.object({
+    status: z.literal("0"),
+    message: z.string(),
+    result: z.string(),
+});
 
-type Response<T> = SuccessResponse<T> | ErrorResponse;
-type EndpointParams = { module: string; action: string } & Record<string, string>;
+const Response = z.discriminatedUnion("status", [SuccessResponse, ErrorResponse]);
+type Response = z.infer<typeof Response>;
+
+type EndpointParams = { module: string; action: string } & Record<
+    string,
+    string | number | boolean
+>;
 
 const BalanceOptions = z.object({
     tag: z.enum(["latest", "earliest", "pending"]).optional().default("latest"),
@@ -507,6 +512,30 @@ const EthereumNodeSize = z.object({
     syncMode: z.enum(["Default", "Archive"]),
 });
 
+type JsonRpcResponseOk = { ok: true; result: unknown };
+const JsonRpcResponseOk = z
+    .object({
+        id: z.unknown(),
+        jsonrpc: z.literal("2.0"),
+        result: z.unknown(),
+    })
+    .transform(({ result }) => ({ ok: true, result } as JsonRpcResponseOk));
+
+type JsonRpcResponseError = { ok: false; error: { code: number; message: string } };
+const JsonRpcResponseError = z
+    .object({
+        id: z.unknown(),
+        jsonrpc: z.literal("2.0"),
+        error: z.object({
+            code: Integer,
+            message: z.string(),
+        }),
+    })
+    .transform(({ error }) => ({ ok: false, error } as JsonRpcResponseError));
+
+export const JsonRpcResponse = JsonRpcResponseOk.or(JsonRpcResponseError);
+export type JsonRpcResponse = z.infer<typeof JsonRpcResponse>;
+
 const NodeCount = z
     .object({
         UTCDate: z
@@ -875,26 +904,35 @@ export class EtherScanClient {
         return NodeCount.parse(response);
     }
 
-    private callApi<T = unknown>(params: EndpointParams): Promise<T> {
-        const endPoint = this.encodeQueryParams({
-            ...params,
-            apikey: this.apiKey,
-        });
-        return this.fetch<T>(endPoint);
-    }
-
-    private encodeQueryParams(params: Record<string, string>): string {
+    private encodeQueryParams(params: Record<string, string | number | boolean>): URL {
         const url = new URL(this.apiUrl);
-        url.search = new URLSearchParams(params).toString();
-        return url.toString();
+        url.searchParams.set("apikey", this.apiKey);
+        for (const [key, value] of Object.entries(params)) {
+            url.searchParams.set(key, value.toString());
+        }
+        return url;
     }
 
-    private async fetch<T>(url: string): Promise<T> {
-        const response = await fetch(url);
-        const json = (await response.json()) as Response<T>;
-        if (json.status === "0") {
-            throw new Error(json.result);
+    private async callApi(params: EndpointParams): Promise<unknown> {
+        const endPoint = this.encodeQueryParams(params);
+        const response = await fetch(endPoint);
+        const apiResponse = Response.parse(await response.json());
+        if (apiResponse.status === "0") {
+            throw new Error(apiResponse.message);
         }
-        return json.result;
+        return apiResponse.result;
+    }
+
+    private async callJsonRpc(params: Omit<EndpointParams, "module">): Promise<unknown> {
+        const endPoint = this.encodeQueryParams({
+            module: "proxy",
+            ...params,
+        });
+        const response = await fetch(endPoint);
+        const jsonRpcResponse = JsonRpcResponse.parse(await response.json());
+        if (!jsonRpcResponse.ok) {
+            throw new Error(jsonRpcResponse.error.message);
+        }
+        return jsonRpcResponse.result;
     }
 }
