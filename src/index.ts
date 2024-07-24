@@ -1,4 +1,5 @@
 import { ofetch } from "ofetch";
+import type { Storage } from "unstorage";
 import { getAddress, InvalidAddressError, parseEther } from "viem";
 import { z } from "zod";
 
@@ -131,14 +132,14 @@ const Transaction = z.object({
 	blockHash: z.string(),
 	transactionIndex: Integer,
 	from: Address,
-	to: AddressOrEmpty,
+	to: OptionalAddress,
 	value: Ether,
 	gas: BigInt,
 	gasPrice: BigInt,
 	isError: EnumBoolean,
 	txreceipt_status: EnumBoolean,
 	input: HexValue,
-	contractAddress: AddressOrEmpty,
+	contractAddress: OptionalAddress,
 	cumulativeGasUsed: BigInt,
 	gasUsed: BigInt,
 	confirmations: Integer,
@@ -152,9 +153,9 @@ const InternalTransaction = z.object({
 	timeStamp: TimeStamp,
 	hash: z.string(),
 	from: Address,
-	to: AddressOrEmpty,
+	to: OptionalAddress,
 	value: Ether,
-	contractAddress: AddressOrEmpty,
+	contractAddress: OptionalAddress,
 	input: OptionalString.or(HexValue),
 	type: z.enum(["call", "create"]),
 	gas: BigInt,
@@ -168,9 +169,9 @@ const InternalTransactionByHash = z.object({
 	blockNumber: Integer,
 	timeStamp: TimeStamp,
 	from: Address,
-	to: AddressOrEmpty,
+	to: OptionalAddress,
 	value: Ether,
-	contractAddress: AddressOrEmpty,
+	contractAddress: OptionalAddress,
 	input: OptionalString.or(HexValue),
 	type: z.enum(["call", "create"]),
 	gas: BigInt,
@@ -598,7 +599,7 @@ const Signed2930Transaction = z.object({
 	nonce: HexString,
 	gasPrice: HexString,
 	gasLimit: HexString,
-	to: AddressOrEmpty,
+	to: OptionalAddress,
 	value: Ether,
 	data: HexString.optional(),
 	accessList: z.array(
@@ -616,7 +617,7 @@ const Signed1559Transaction = z.object({
 	type: z.literal("0x2"),
 	nonce: HexString,
 	gasLimit: HexString,
-	to: AddressOrEmpty,
+	to: OptionalAddress,
 	maxPriorityFeePerGas: HexString,
 	maxFeePerGas: HexString,
 	value: Ether,
@@ -675,11 +676,39 @@ const NodeCount = z
 		nodeCount,
 	}));
 
-export class EtherScanClient {
-	constructor(
-		private readonly apiKey: string,
-		private readonly apiUrl = "https://api.etherscan.io/api",
-	) {}
+/**
+ * {@link Client `Client`} uses `Cache` instance as a read-through cache first URL and
+ * HTTP headers are checked in `Cache.storage`, if the resource is in the cache no request
+ * is sent. Otherwise, resource is fetched and persisted on the cache.
+ */
+export interface Cache {
+	// Function to use when serializing request URL and headers.
+	serialize: (object: unknown) => string;
+	/**
+	 * {@link Storage `Storage`} instance from {@link https://unstorage.unjs.io/guide | `unstorage`} used for
+	 * persisting resources.
+	 */
+	storage: Storage;
+}
+
+export interface ClientOptions {
+	cache: Cache;
+	apiKey: string;
+	apiUrl: string;
+}
+
+export class Client {
+	public readonly apiUrl: string = "https://api.etherscan.io/api";
+	public readonly cache?: Cache;
+	private readonly apiKey?: string;
+
+	constructor({ cache, apiKey, apiUrl }: Partial<ClientOptions>) {
+		this.cache = cache;
+		this.apiKey = apiKey;
+		if (apiUrl) {
+			this.apiUrl = apiUrl;
+		}
+	}
 
 	async getBalance(address: string, options: BalanceOptions = {}) {
 		const balance = await this.callApi({
@@ -1000,9 +1029,26 @@ export class EtherScanClient {
 		return NodeCount.parse(response);
 	}
 
-	private encodeQueryParams(params: Record<string, Primitive>) {
+	async fetch(params: Record<string, Primitive>): Promise<unknown> {
+		const url = this.encodeQueryParams(params);
+		if (!this.cache) {
+			return await ofetch(url);
+		}
+		const key = this.cache.serialize(params);
+		const value = await this.cache.storage.getItem(key);
+		if (value) {
+			return value;
+		}
+		const response = await ofetch(url);
+		await this.cache.storage.setItem(key, response);
+		return response;
+	}
+
+	private encodeQueryParams(params: Record<string, Primitive>): URL {
 		const url = new URL(this.apiUrl);
-		url.searchParams.set("apikey", this.apiKey);
+		if (this.apiKey) {
+			url.searchParams.set("apikey", this.apiKey);
+		}
 		for (const [key, value] of Object.entries(params)) {
 			if (value === undefined || value === null) {
 				continue;
@@ -1013,8 +1059,7 @@ export class EtherScanClient {
 	}
 
 	private async callApi(params: EndpointParams): Promise<unknown> {
-		const endPoint = this.encodeQueryParams(params);
-		const response = await ofetch(endPoint);
+		const response = await this.fetch(params);
 		const apiResponse = Response.parse(response);
 		if (apiResponse.status === "0") {
 			throw new Error(apiResponse.message);
@@ -1023,11 +1068,10 @@ export class EtherScanClient {
 	}
 
 	private async callJsonRpc(params: Omit<EndpointParams, "module">): Promise<unknown> {
-		const endPoint = this.encodeQueryParams({
+		const response = await this.fetch({
 			module: "proxy",
 			...params,
 		});
-		const response = await ofetch(endPoint);
 		const jsonRpcResponse = JsonRpcResponse.parse(response);
 		if (!jsonRpcResponse.ok) {
 			throw new Error(jsonRpcResponse.error.message);
