@@ -1,38 +1,25 @@
+// See https://www.totaltypescript.com/tsconfig-cheat-sheet.
 {
-    "compilerOptions": {
-        "target": "es5",
-        "lib": ["dom", "dom.iterable", "esnext"],
-        "allowJs": true,
-        "skipLibCheck": true,
-        "strict": true,
-        "forceConsistentCasingInFileNames": true,
-        "noEmit": true,
-        "esModuleInterop": true,
-        "module": "esnext",
-        "moduleResolution": "node",
-        "resolveJsonModule": true,
-        "isolatedModules": true,
-        "jsx": "preserve",
-        "incremental": true,
-        "plugins": [
-            {
-                "name": "next"
-            }
-        ],
-        "paths": {
-            "~/*": ["./src/*"]
-        }
-    },
-    "include": [
-        "next-env.d.ts",
-        "**/*.ts",
-        "**/*.tsx",
-        ".next/types/**/*.ts",
-        ".eslintrc.js",
-        ".prettierrc.js",
-        "next.config.mjs",
-        "postcss.config.js",
-        "tailwind.config.js"
-    ],
-    "exclude": ["node_modules"]
+	"compilerOptions": {
+		// Base options.
+		"esModuleInterop": true,
+		"skipLibCheck": true,
+		"target": "es2022",
+		"allowJs": true,
+		"resolveJsonModule": true,
+		"moduleDetection": "force",
+		"isolatedModules": true,
+		"verbatimModuleSyntax": true,
+		// Strictness.
+		"strict": true,
+		"noUncheckedIndexedAccess": true,
+		"noImplicitOverride": true,
+		// Building a library.
+		"declaration": true,
+		// Transpiling with a bundler.
+		"module": "preserve",
+		"noEmit": true,
+		// No DOM.
+		"lib": ["es2022"]
+	}
 }
