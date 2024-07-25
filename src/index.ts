@@ -14,7 +14,7 @@ import {
 import {
 	Address,
 	BigInt_,
-	BlockTagEnum,
+	BlockIdentifier,
 	EnumBoolean,
 	Ether,
 	HexString,
@@ -22,6 +22,7 @@ import {
 	Integer,
 	OptionalAddress,
 	OptionalString,
+	serializeBlockIdentifier,
 	TimeStamp,
 } from "./core";
 import {
@@ -238,9 +239,6 @@ const JsonRpcResponseError = z
 export const JsonRpcResponse = JsonRpcResponseOk.or(JsonRpcResponseError);
 export type JsonRpcResponse = z.infer<typeof JsonRpcResponse>;
 
-const BlockTag = BlockTagEnum.or(Integer.min(0).transform(data => `0x${data.toString(16)}`));
-export type BlockTag = BlockTagEnum | number;
-
 export const Block = z
 	.object({
 		difficulty: BigInt_,
@@ -363,6 +361,13 @@ const NodeCount = z
 		nodeCount,
 	}));
 
+export const Tag = z.enum(["earliest", "pending", "latest"]);
+
+/**
+ * Pre-defined block parameter, either `"finalized"`, `"earliest"`, `"pending"` or `"latest"`
+ */
+export type Tag = z.infer<typeof Tag>;
+
 /**
  * {@link Client `Client`} uses `Cache` instance as a read-through cache first URL and
  * HTTP headers are checked in `Cache.storage`, if the resource is in the cache no request
@@ -406,12 +411,12 @@ export class Client {
 	 *
 	 * @see {@link https://docs.etherscan.io/api-endpoints/accounts#get-ether-balance-for-a-single-address | Etherscan API docs}
 	 */
-	async getBalance(address: string, tag?: BlockTagEnum) {
+	async getBalance(address: string, tag?: Tag) {
 		const balance = await this.callApi({
 			module: "account",
 			action: "balance",
 			address: Address.parse(address),
-			tag: BlockTagEnum.optional().parse(tag),
+			tag: Tag.default("latest").parse(tag),
 		});
 		return Ether.parse(balance);
 	}
@@ -425,12 +430,12 @@ export class Client {
 	 *
 	 * @see {@link https://docs.etherscan.io/api-endpoints/accounts#get-ether-balance-for-multiple-addresses-in-a-single-call | Etherscan API docs}
 	 */
-	async getBalances(addresses: string[], tag?: BlockTagEnum) {
+	async getBalances(addresses: string[], tag?: Tag) {
 		const result = await this.callApi({
 			module: "account",
 			action: "balancemulti",
 			address: GetBalancesInput.parse(addresses).join(","),
-			tag: BlockTagEnum.optional().parse(tag),
+			tag: Tag.default("latest").parse(tag),
 		});
 		return GetBalancesResult.parse(result);
 	}

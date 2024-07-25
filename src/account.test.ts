@@ -17,18 +17,18 @@ const NEW_ADDRESS = "0x6B182919cAAaC95272c45bfC61ec418d0E301140";
 
 test("get-balance", async () => {
 	await expect(client.getBalance(NEW_ADDRESS)).resolves.toBeGreaterThan(0n);
-	await expect(client.getBalance(NEW_ADDRESS, "finalized")).resolves.toBeGreaterThan(0n);
+	await expect(client.getBalance(NEW_ADDRESS, "pending")).resolves.toBeGreaterThan(0n);
 	await expect(client.getBalance(NEW_ADDRESS, "latest")).resolves.toBeGreaterThan(0n);
-	await expect(client.getBalance(NEW_ADDRESS, "safe")).resolves.toBeGreaterThan(0n);
 
 	await expect(client.getBalance(OLD_ADDRESS)).resolves.toBeGreaterThan(0n);
-	await expect(client.getBalance(OLD_ADDRESS, "finalized")).resolves.toBeGreaterThan(0n);
+	await expect(client.getBalance(OLD_ADDRESS, "pending")).resolves.toBeGreaterThan(0n);
 	await expect(client.getBalance(OLD_ADDRESS, "latest")).resolves.toBeGreaterThan(0n);
-	await expect(client.getBalance(OLD_ADDRESS, "safe")).resolves.toBeGreaterThan(0n);
 });
 
 test("get-balances", async () => {
 	await expect(client.getBalances([OLD_ADDRESS, NEW_ADDRESS])).resolves.toHaveLength(2);
+	await expect(client.getBalances([OLD_ADDRESS, NEW_ADDRESS]), "pending").resolves.toHaveLength(2);
+	await expect(client.getBalances([OLD_ADDRESS, NEW_ADDRESS]), "latest").resolves.toHaveLength(2);
 });
 
 test.todo("get-transactions", async () => {

@@ -25,14 +25,6 @@ export const Address = z.string().transform((value, ctx) => {
  */
 export const Ether = z.string().transform(ether => parseEther(ether));
 
-export const BlockTagEnum = z.union([
-	z.literal("earliest"),
-	z.literal("finalized"),
-	z.literal("safe"),
-	z.literal("latest"),
-]);
-export type BlockTagEnum = z.infer<typeof BlockTagEnum>;
-
 /**
  * Optional string represented as an empty string `""` or a non-empty string
  */
@@ -78,3 +70,31 @@ export const BigInt_ = z.coerce.bigint();
  * Boolean represented as a string `"0"` or `"1"`
  */
 export const EnumBoolean = z.enum(["0", "1"]).transform(value => value === "1");
+
+export const BlockTag = z.union([
+	z.literal("earliest"),
+	z.literal("finalized"),
+	z.literal("safe"),
+	z.literal("latest"),
+]);
+
+/**
+ * Block tag represented as a string
+ * - `"earliest"`: the earliest block the client has available
+ * - `"finalized"`: the latest finalized block
+ * - `"safe"`: the latest safe block that is secure from re-orgs
+ * - `"latest"`: the latest block in the canonical chain
+ */
+export type BlockTag = z.infer<typeof BlockTag>;
+
+export const BlockIdentifier = BlockTag.or(Integer.min(0));
+
+/**
+ * Block identifier represented as a {@link BlockTag `BlockTag`} or a block number.
+ */
+export type BlockIdentifier = z.infer<typeof BlockIdentifier>;
+
+export function serializeBlockIdentifier(block: BlockIdentifier): string {
+	const identifier = BlockIdentifier.parse(block);
+	return typeof identifier === "number" ? `0x${identifier.toString(16)}` : identifier;
+}
