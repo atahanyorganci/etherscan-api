@@ -1,7 +1,7 @@
 import { objectHash, sha256base64 } from "ohash";
 import { type Driver, type Storage, createStorage } from "unstorage";
 import memoryDriver from "unstorage/drivers/memory";
-import type { Cache, Client } from "..";
+import type { Cache } from "..";
 
 /**
  * Options for {@link createCache `createCache`}

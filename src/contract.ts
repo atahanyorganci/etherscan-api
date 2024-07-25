@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Address, EnumBoolean, HexString, HexValue, OptionalString } from "./core";
+import { Address, EnumBoolean, HexString, OptionalString } from "./core";
 
 export const Component = z.object({
 	type: z.string(),
