@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Address, BigInt_, Ether, Integer, TimeStamp } from "./core";
+import { Address, Wei, Ether, Integer, TimeStamp } from "./core";
 
 export const GetBalancesInput = z.array(Address).max(20);
 export type GetBalancesInput = z.infer<typeof GetBalancesInput>;
@@ -37,10 +37,10 @@ export const Erc20Transfer = z.object({
 	tokenSymbol: z.string(),
 	tokenDecimal: z.coerce.number(),
 	transactionIndex: Integer,
-	gas: BigInt_,
-	gasPrice: BigInt_,
-	gasUsed: BigInt_,
-	cumulativeGasUsed: BigInt_,
+	gas: Wei,
+	gasPrice: Wei,
+	gasUsed: Wei,
+	cumulativeGasUsed: Wei,
 	input: z.string(),
 	confirmations: Integer,
 });
@@ -60,10 +60,10 @@ export const Erc721Transfer = z.object({
 	tokenSymbol: z.string(),
 	tokenDecimal: z.literal("0"),
 	transactionIndex: Integer,
-	gas: BigInt_,
-	gasPrice: BigInt_,
-	gasUsed: BigInt_,
-	cumulativeGasUsed: BigInt_,
+	gas: Wei,
+	gasPrice: Wei,
+	gasUsed: Wei,
+	cumulativeGasUsed: Wei,
 	input: z.string(),
 	confirmations: Integer,
 });
@@ -76,10 +76,10 @@ export const Erc1155Transfer = z.object({
 	nonce: Integer,
 	blockHash: z.string(),
 	transactionIndex: Integer,
-	gas: BigInt_,
-	gasPrice: BigInt_,
-	gasUsed: BigInt_,
-	cumulativeGasUsed: BigInt_,
+	gas: Wei,
+	gasPrice: Wei,
+	gasUsed: Wei,
+	cumulativeGasUsed: Wei,
 	input: z.string(),
 	contractAddress: Address,
 	from: Address,
@@ -104,6 +104,6 @@ export type GetValidatedBlockOptions = Partial<z.infer<typeof GetValidatedBlockO
 export const ValidatedBlock = z.object({
 	blockNumber: Integer,
 	timeStamp: TimeStamp,
-	blockReward: BigInt_,
+	blockReward: Wei,
 });
 export type ValidatedBlock = z.infer<typeof ValidatedBlock>;

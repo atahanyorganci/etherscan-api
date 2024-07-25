@@ -1,21 +1,21 @@
 import { z } from "zod";
-import { Integer, TimeStamp, Address, BigInt_ } from "./core";
+import { Integer, TimeStamp, Address, Wei } from "./core";
 
 export const BlockAndUncleRewards = z.object({
 	blockNumber: Integer,
 	timeStamp: TimeStamp,
 	blockMiner: Address,
-	blockReward: BigInt_,
+	blockReward: Wei,
 	uncles: z.array(
 		z
 			.object({
 				miner: Address,
 				unclePosition: Integer.min(0),
-				blockreward: BigInt_,
+				blockreward: Wei,
 			})
 			.transform(({ blockreward, ...rest }) => ({ ...rest, blockReward: blockreward })),
 	),
-	uncleInclusionReward: BigInt_,
+	uncleInclusionReward: Wei,
 });
 export type BlockAndUncleRewards = z.infer<typeof BlockAndUncleRewards>;
 

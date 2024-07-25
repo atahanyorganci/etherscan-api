@@ -13,7 +13,7 @@ import {
 } from "./account";
 import {
 	Address,
-	BigInt_,
+	Wei,
 	BlockIdentifier,
 	EnumBoolean,
 	Ether,
@@ -71,6 +71,7 @@ export const PaginationOptions = z.object({
 	offset: Integer.min(1).max(10000).optional(),
 	sort: z.enum(["asc", "desc"]).optional(),
 });
+
 /**
  * - `startBlock` - block number to start searching for transactions
  * - `endBlock` - block number to stop searching for transactions
@@ -105,14 +106,14 @@ const Transaction = z.object({
 	from: Address,
 	to: OptionalAddress,
 	value: Ether,
-	gas: BigInt_,
-	gasPrice: BigInt_,
+	gas: Wei,
+	gasPrice: Wei,
 	isError: EnumBoolean,
 	txreceipt_status: EnumBoolean,
 	input: HexValue,
 	contractAddress: OptionalAddress,
-	cumulativeGasUsed: BigInt_,
-	gasUsed: BigInt_,
+	cumulativeGasUsed: Wei,
+	gasUsed: Wei,
 	confirmations: Integer,
 	methodId: HexValue,
 	functionName: OptionalString,
@@ -129,8 +130,8 @@ const InternalTransaction = z.object({
 	contractAddress: OptionalAddress,
 	input: OptionalString.or(HexValue),
 	type: z.enum(["call", "create"]),
-	gas: BigInt_,
-	gasUsed: BigInt_,
+	gas: Wei,
+	gasUsed: Wei,
 	traceId: z.string(),
 	isError: EnumBoolean,
 	errCode: OptionalString,
@@ -145,8 +146,8 @@ const InternalTransactionByHash = z.object({
 	contractAddress: OptionalAddress,
 	input: HexValue.or(OptionalString),
 	type: z.enum(["call", "create"]),
-	gas: BigInt_,
-	gasUsed: BigInt_,
+	gas: Wei,
+	gasUsed: Wei,
 	isError: EnumBoolean,
 	errCode: OptionalString,
 });
@@ -818,7 +819,7 @@ export class Client {
 			module: "proxy",
 			action: "eth_gasPrice",
 		});
-		return BigInt_.parse(response);
+		return Wei.parse(response);
 	}
 
 	/**
@@ -837,7 +838,7 @@ export class Client {
 			gasPrice: gasPrice ? `0x${gasPrice.toString(16)}` : undefined,
 			...params,
 		});
-		return BigInt_.parse(response);
+		return Wei.parse(response);
 	}
 
 	async getEtherSupply() {

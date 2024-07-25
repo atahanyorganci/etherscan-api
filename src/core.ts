@@ -64,7 +64,7 @@ export const Integer = z.coerce.number().int();
 /**
  * Big integer represented as a string of digits
  */
-export const BigInt_ = z.coerce.bigint();
+export const Wei = z.coerce.bigint();
 
 /**
  * Boolean represented as a string `"0"` or `"1"`

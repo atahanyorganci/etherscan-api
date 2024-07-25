@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Address, HexString, HexValue, Integer, TimeStamp, BigInt_ } from "./core";
+import { Address, HexString, HexValue, Integer, TimeStamp, Wei } from "./core";
 
 export const Operator = z.enum(["and", "or"]);
 export type Operator = z.infer<typeof Operator>;
@@ -30,8 +30,8 @@ export const Log = z.object({
 	data: HexValue,
 	blockNumber: Integer,
 	timeStamp: TimeStamp,
-	gasPrice: BigInt_,
-	gasUsed: BigInt_,
+	gasPrice: Wei,
+	gasUsed: Wei,
 	logIndex: HexValue,
 	transactionHash: HexValue,
 	transactionIndex: HexValue,
