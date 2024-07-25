@@ -35,7 +35,8 @@ test("get-block-and-uncle-rewards-by-block-number", async () => {
 });
 
 test("get-estimated-block-countdown-time-by-block-number", async () => {
-	await expect(client.getEstimatedTimeToBlockNumber(20383559)).resolves.toBeDefined();
+	const current = await client.getBlockNumber();
+	await expect(client.getEstimatedTimeToBlockNumber(current + 1_000)).resolves.toBeDefined();
 });
 
 test.todo("get-closest-block-number-by-timestamp", async () => {
