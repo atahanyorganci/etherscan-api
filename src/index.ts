@@ -31,6 +31,7 @@ import {
 	GetContractCreationInput,
 	ContractCreation,
 } from "./contract";
+import { ContractExecutionStatus, TransactionReceiptStatus } from "./transaction";
 
 type Primitive = boolean | string | number | undefined | null;
 
@@ -136,15 +137,6 @@ const InternalTransactionByHash = z.object({
 	gasUsed: BigInt_,
 	isError: EnumBoolean,
 	errCode: OptionalString,
-});
-
-const ContractExecutionStatus = z.object({
-	isError: EnumBoolean,
-	errDescription: OptionalString,
-});
-
-const TransactionReceiptStatus = z.object({
-	status: EnumBoolean,
 });
 
 const BlockAndUncleRewards = z.object({
@@ -714,7 +706,15 @@ export class Client {
 		return z.array(ContractCreation).parse(response);
 	}
 
-	async getContractExecutionStatus(hash: string) {
+	/**
+	 * Returns the status code of a contract execution.
+	 *
+	 * @param hash transaction hash to check the execution status
+	 * @returns `ContractExecutionStatus`
+	 *
+	 * @see {@link https://docs.etherscan.io/api-endpoints/stats#check-contract-execution-status Etherscan API docs}
+	 */
+	async checkTransactionStatus(hash: string) {
 		const response = await this.callApi({
 			module: "transaction",
 			action: "getstatus",
@@ -723,7 +723,15 @@ export class Client {
 		return ContractExecutionStatus.parse(response);
 	}
 
-	async getTransactionReceiptStatus(hash: string) {
+	/**
+	 * Returns the status code of a transaction execution.
+	 *
+	 * @param hash  transaction hash to check the receipt status
+	 * @returns `TransactionReceiptStatus`
+	 *
+	 * @see {@link https://docs.etherscan.io/api-endpoints/stats#check-transaction-receipt-status Etherscan API docs}
+	 */
+	async checkTransactionReceiptStatus(hash: string) {
 		const response = await this.callApi({
 			module: "transaction",
 			action: "gettxreceiptstatus",
