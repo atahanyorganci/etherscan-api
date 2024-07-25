@@ -98,3 +98,5 @@ export function serializeBlockIdentifier(block: BlockIdentifier): string {
 	const identifier = BlockIdentifier.parse(block);
 	return typeof identifier === "number" ? `0x${identifier.toString(16)}` : identifier;
 }
+
+export const DateString = z.string().refine(data => data.match(/^\d{4}-\d{2}-\d{2}$/));

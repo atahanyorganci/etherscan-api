@@ -46,6 +46,13 @@ import {
 } from "./json-rpc";
 import { GetErc20BalanceParams } from "./token";
 import { GasOracleResponse } from "./gas-tracker";
+import {
+	Ether2Supply,
+	EtherPriceResponse,
+	GetEthereumNodeSizeParams,
+	GetEthereumNodesSizeResponse,
+	NodeCountResponse,
+} from "./stats";
 
 type Primitive = boolean | string | number | undefined | null;
 
@@ -154,79 +161,6 @@ const InternalTransactionByHash = z.object({
 	errCode: OptionalString,
 });
 
-const Ether2Supply = z
-	.object({
-		EthSupply: Ether,
-		Eth2Supply: Ether,
-		BurntFees: Ether,
-		WithdrawnTotal: Ether,
-	})
-	.transform(
-		({
-			EthSupply: etherSupply,
-			Eth2Supply: ether2Supply,
-			BurntFees: burntFees,
-			WithdrawnTotal: withdrawnTotal,
-		}) => ({
-			etherSupply,
-			ether2Supply,
-			burntFees,
-			withdrawnTotal,
-		}),
-	);
-
-const EtherPrice = z
-	.object({
-		ethbtc: Ether,
-		ethbtc_timestamp: TimeStamp,
-		ethusd: Ether,
-		ethusd_timestamp: TimeStamp,
-	})
-	.transform(
-		({
-			ethbtc: eth2btc,
-			ethbtc_timestamp: eth2btcTimeStamp,
-			ethusd: eth2usd,
-			ethusd_timestamp: eth2usdTimeStamp,
-		}) => ({
-			eth2btc,
-			eth2btcTimeStamp,
-			eth2usd,
-			eth2usdTimeStamp,
-		}),
-	);
-
-const DateString = z
-	.string()
-	.refine(data => data.match(/^\d{4}-\d{2}-\d{2}$/))
-	.or(z.date().transform(date => date.toISOString().split("T")[0]));
-
-const GetEthereumNodeSizeOptions = z.object({
-	startDate: DateString,
-	endDate: DateString,
-	clientType: z.enum(["geth", "parity"]).default("geth"),
-	syncMode: z.enum(["default", "archive"]).default("default"),
-	sort: z.enum(["asc", "desc"]).default("asc"),
-});
-type GetEthereumNodeSizeOptions = {
-	startDate: string;
-	endDate: string;
-	clientType?: "geth" | "parity";
-	syncMode?: "default" | "archive";
-	sort?: "asc" | "desc";
-};
-
-const EthereumNodeSize = z.object({
-	blockNumber: Integer,
-	chainTimeStamp: z
-		.string()
-		.refine(data => data.match(/^\d{4}-\d{2}-\d{2}$/))
-		.transform(date => new Date(date)),
-	chainSize: Integer,
-	clientType: z.enum(["Geth", "Parity"]),
-	syncMode: z.enum(["Default", "Archive"]),
-});
-
 type JsonRpcResponseOk = { ok: true; result: unknown };
 const JsonRpcResponseOk = z
 	.object({
@@ -250,19 +184,6 @@ const JsonRpcResponseError = z
 
 export const JsonRpcResponse = JsonRpcResponseOk.or(JsonRpcResponseError);
 export type JsonRpcResponse = z.infer<typeof JsonRpcResponse>;
-
-const NodeCount = z
-	.object({
-		UTCDate: z
-			.string()
-			.refine(data => data.match(/^\d{4}-\d{2}-\d{2}$/))
-			.transform(date => new Date(date)),
-		TotalNodeCount: Integer,
-	})
-	.transform(({ UTCDate: date, TotalNodeCount: nodeCount }) => ({
-		date,
-		nodeCount,
-	}));
 
 export const Tag = z.enum(["earliest", "pending", "latest"]);
 
@@ -907,6 +828,12 @@ export class Client {
 		return GasOracleResponse.parse(response);
 	}
 
+	/**
+	 * Returns the current amount of Ether in circulation excluding ETH2 Staking rewards and EIP1559 burnt fees.
+	 * @returns Ether supply in wei
+	 *
+	 * @see {@link https://docs.etherscan.io/api-endpoints/stats-1#get-total-supply-of-ether | Etherscan API docs}
+	 */
 	async getEtherSupply() {
 		const response = await this.callApi({
 			module: "stats",
@@ -915,6 +842,13 @@ export class Client {
 		return Ether.parse(response);
 	}
 
+	/**
+	 * Returns the current amount of Ether in circulation, ETH2 Staking rewards, EIP1559 burnt fees, and
+	 * total withdrawn ETH from the beacon chain.
+	 * @returns supply of Ether and Ether2 in wei
+	 *
+	 * @see {@link https://docs.etherscan.io/api-endpoints/stats-1#get-total-supply-of-ether-2 | Etherscan API docs}
+	 */
 	async getEther2Supply() {
 		const response = await this.callApi({
 			module: "stats",
@@ -923,46 +857,54 @@ export class Client {
 		return Ether2Supply.parse(response);
 	}
 
+	/**
+	 * Returns the last known price of Ether in USD.
+	 * @returns `EtherPriceResponse` object with price in USD
+	 *
+	 * @see {@link https://docs.etherscan.io/api-endpoints/stats-1#get-ether-last-price | Etherscan API docs}
+	 */
 	async getLastEtherPrice() {
 		const response = await this.callApi({
 			module: "stats",
 			action: "ethprice",
 		});
-		return EtherPrice.parse(response);
+		return EtherPriceResponse.parse(response);
 	}
 
-	async getEthereumNodeSize(options: GetEthereumNodeSizeOptions) {
+	/**
+	 * Returns the size of the Ethereum blockchain, in bytes, over a date range.
+	 * @param params `GetEthereumNodeSizeParams` object
+	 * @returns `GetEthereumNodesSizeResponse`
+	 *
+	 * @see {@link https://docs.etherscan.io/api-endpoints/stats-1#get-ethereum-nodes-size | Etherscan API docs}
+	 */
+	async getEthereumNodeSize(params: GetEthereumNodeSizeParams) {
 		const { startDate, endDate, clientType, sort, syncMode } =
-			GetEthereumNodeSizeOptions.parse(options);
+			GetEthereumNodeSizeParams.parse(params);
 		const response = await this.callApi({
 			module: "stats",
 			action: "chainsize",
 			startdate: startDate,
 			enddate: endDate,
 			clienttype: clientType,
-			sort,
 			syncmode: syncMode,
+			sort,
 		});
-		const nodeSizes = z.array(EthereumNodeSize).parse(response);
-		return {
-			clientType,
-			syncMode,
-			nodeSizes: nodeSizes.map(
-				({ blockNumber: blockNo, chainSize, chainTimeStamp: timeStamp }) => ({
-					blockNo,
-					chainSize,
-					timeStamp,
-				}),
-			),
-		};
+		return GetEthereumNodesSizeResponse.parse(response);
 	}
 
+	/**
+	 * Returns the total number of discoverable Ethereum nodes.
+	 * @returns `NodeCount`
+	 *
+	 * @see {@link https://docs.etherscan.io/api-endpoints/stats-1#get-total-nodes-count | Etherscan API docs}
+	 */
 	async getNodeCount() {
 		const response = await this.callApi({
 			module: "stats",
 			action: "nodecount",
 		});
-		return NodeCount.parse(response);
+		return NodeCountResponse.parse(response);
 	}
 
 	async fetch(params: Record<string, Primitive>): Promise<unknown> {
