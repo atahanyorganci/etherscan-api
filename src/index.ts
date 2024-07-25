@@ -15,6 +15,7 @@ import {
 	Address,
 	BigInt_,
 	BlockTagEnum,
+	EnumBoolean,
 	Ether,
 	HexString,
 	HexValue,
@@ -23,13 +24,15 @@ import {
 	OptionalString,
 	TimeStamp,
 } from "./core";
+import {
+	AbiStr,
+	AbiItem,
+	ContractSourceCodeResponse,
+	GetContractCreationInput,
+	ContractCreation,
+} from "./contract";
 
 type Primitive = boolean | string | number | undefined | null;
-
-/**
- * Boolean represented as a string `"0"` or `"1"`
- */
-export const EnumBoolean = z.enum(["0", "1"]).transform(value => value === "1");
 
 const SuccessResponse = z.object({
 	status: z.literal("1"),
@@ -133,104 +136,6 @@ const InternalTransactionByHash = z.object({
 	gasUsed: BigInt_,
 	isError: EnumBoolean,
 	errCode: OptionalString,
-});
-
-const MultiFileSourceCode = z
-	.string()
-	.refine(value => {
-		if (!value.startsWith("{") || !value.endsWith("}")) {
-			return false;
-		}
-		try {
-			JSON.parse(value.substring(1, value.length - 1));
-		} catch (e) {
-			return false;
-		}
-		return true;
-	})
-	.transform(value => JSON.parse(value.substring(1, value.length - 1)) as unknown)
-	.pipe(
-		z.object({
-			language: z.string(),
-			sources: z
-				.record(z.object({ content: z.string() }))
-				.transform(sources =>
-					Object.entries(sources).map(([name, { content }]) => ({ name, content })),
-				),
-			settings: z.object({}).passthrough().optional(),
-		}),
-	);
-
-export const ContractSourceCode = z
-	.object({
-		SourceCode: MultiFileSourceCode.or(z.string()),
-		ABI: z.string(),
-		ContractName: z.string(),
-		CompilerVersion: z.string(),
-		OptimizationUsed: EnumBoolean,
-		Runs: z.coerce.number(),
-		ConstructorArguments: z.string(),
-		EVMVersion: z.string(),
-		Library: z.string(),
-		LicenseType: z.string(),
-		Proxy: EnumBoolean,
-		Implementation: OptionalString,
-		SwarmSource: OptionalString,
-	})
-	.transform(
-		({
-			SourceCode: sourceCode,
-			ABI: abi,
-			ContractName: name,
-			CompilerVersion: compilerVersion,
-			OptimizationUsed: isOptimized,
-			Runs: optimizationRuns,
-			ConstructorArguments: constructorArguments,
-			EVMVersion: evmVersion,
-			Library: library,
-			LicenseType: license,
-			Proxy: proxy,
-			Implementation: implementation,
-			SwarmSource: swarmSource,
-		}) => ({
-			name,
-			license,
-			evmVersion,
-			compilerVersion,
-			isOptimized,
-			optimizationRuns,
-			sourceCode,
-			abi,
-			constructorArguments,
-			library,
-			proxy,
-			implementation,
-			swarmSource,
-		}),
-	);
-export type ContractSourceCode = z.infer<typeof ContractSourceCode>;
-
-const NotContract = z
-	.object({
-		ABI: z.string(),
-	})
-	.refine(value => value.ABI === "Contract source code not verified")
-	.transform(() => undefined);
-
-const ContractSourceCodeResponse = NotContract.or(ContractSourceCode);
-
-const GetContractCreationInput = Address.or(z.array(Address).min(1).max(5)).transform(addr => {
-	if (Array.isArray(addr)) {
-		return addr;
-	}
-	return [addr];
-});
-type GetContractCreationInput = z.infer<typeof GetContractCreationInput>;
-
-const ContractCreation = z.object({
-	contractAddress: Address,
-	txHash: HexValue,
-	contractCreator: Address,
 });
 
 const ContractExecutionStatus = z.object({
@@ -756,16 +661,33 @@ export class Client {
 		return z.array(ValidatedBlock).parse(result);
 	}
 
-	async getABIForContract(address: string) {
+	/**
+	 * Returns the Application Binary Interface (ABI) of a verified smart contract.
+	 *
+	 * @param address contract address that has a verified source code
+	 * @returns list of {@link AbiItem}
+	 *
+	 * @see {@link https://docs.etherscan.io/api-endpoints/contracts#get-contract-abi-for-verified-contract-source-codes | Etherscan API docs}
+	 * @see {@link https://docs.soliditylang.org/en/latest/abi-spec.html#json | Solidity ABI spec}
+	 */
+	async getAbi(address: string) {
 		const result = await this.callApi({
 			module: "contract",
 			action: "getabi",
 			address: Address.parse(address),
 		});
-		return HexString.parse(result);
+		return AbiStr.parse(result);
 	}
 
-	async getContractSourceCode(address: string) {
+	/**
+	 * Returns the Solidity source code of a verified smart contract.
+	 *
+	 * @param address contract address that has a verified source code
+	 * @returns source code for contract
+	 *
+	 * @see {@link https://docs.etherscan.io/api-endpoints/contracts#get-contract-source-code-for-verified-contract-source-codes | Etherscan API docs}
+	 */
+	async getSourceCode(address: string) {
 		const response = await this.callApi({
 			module: "contract",
 			action: "getsourcecode",
@@ -774,6 +696,14 @@ export class Client {
 		return z.array(ContractSourceCodeResponse).parse(response);
 	}
 
+	/**
+	 * Returns a contract's deployer address and transaction hash it was created, up to 5 at a time.
+	 *
+	 * @param addresses contract addresses, up to 5 at a time
+	 * @returns array of {@link ContractCreation `ContractCreation`} objects
+	 *
+	 * @see {@link https://docs.etherscan.io/api-endpoints/contracts#get-contract-creator-and-creation-tx-hash Etherscan API docs}
+	 */
 	async getContractCreation(addresses: string[]) {
 		const contractAddresses = GetContractCreationInput.parse(addresses).join(",");
 		const response = await this.callApi({

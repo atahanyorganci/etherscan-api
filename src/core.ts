@@ -73,3 +73,8 @@ export const Integer = z.coerce.number().int();
  * Big integer represented as a string of digits
  */
 export const BigInt_ = z.coerce.bigint();
+
+/**
+ * Boolean represented as a string `"0"` or `"1"`
+ */
+export const EnumBoolean = z.enum(["0", "1"]).transform(value => value === "1");
