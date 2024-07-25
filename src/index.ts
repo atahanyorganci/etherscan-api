@@ -44,6 +44,7 @@ import {
 	BlockWithTransactions,
 	GetTransactionInput,
 } from "./json-rpc";
+import { GetErc20BalanceParams } from "./token";
 
 type Primitive = boolean | string | number | undefined | null;
 
@@ -837,6 +838,40 @@ export class Client {
 			gas: gas ? `0x${gas.toString(16)}` : undefined,
 			gasPrice: gasPrice ? `0x${gasPrice.toString(16)}` : undefined,
 			...params,
+		});
+		return Wei.parse(response);
+	}
+
+	/**
+	 * Returns the current amount of an ERC-20 token in circulation.
+	 *
+	 * @param contractAddress contract address
+	 * @returns total supply of the ERC20 token
+	 */
+	async getErc20TokenSupply(contractAddress: string) {
+		const response = await this.callApi({
+			module: "stats",
+			action: "tokensupply",
+			contractaddress: Address.parse(contractAddress),
+		});
+		return Wei.parse(response);
+	}
+
+	/**
+	 * Returns the balance of an ERC-20 token for a given address.
+	 *
+	 * @param params {@link `GetErc20BalanceParams`} object
+	 * @returns balance of the
+	 *
+	 * @see {@link https://docs.etherscan.io/api-endpoints/accounts#get-erc20-token-balance-for-address | Etherscan API docs}
+	 */
+	async getErc20TokenBalance(params: GetErc20BalanceParams) {
+		const { address, contractAddress } = GetErc20BalanceParams.parse(params);
+		const response = await this.callApi({
+			module: "account",
+			action: "tokenbalance",
+			address,
+			contractaddress: contractAddress,
 		});
 		return Wei.parse(response);
 	}
