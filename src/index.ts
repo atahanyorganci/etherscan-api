@@ -14,7 +14,7 @@ import {
 import {
 	Address,
 	Wei,
-	BlockIdentifier,
+	type BlockIdentifier,
 	EnumBoolean,
 	Ether,
 	HexString,
