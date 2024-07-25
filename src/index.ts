@@ -45,6 +45,7 @@ import {
 	GetTransactionInput,
 } from "./json-rpc";
 import { GetErc20BalanceParams } from "./token";
+import { GasOracleResponse } from "./gas-tracker";
 
 type Primitive = boolean | string | number | undefined | null;
 
@@ -874,6 +875,36 @@ export class Client {
 			contractaddress: contractAddress,
 		});
 		return Wei.parse(response);
+	}
+
+	/**
+	 * Returns the estimated time, in seconds, for a transaction to be confirmed on the blockchain.
+	 * @param gasPrice price paid per unit of gas, in wei
+	 * @returns estimated time in seconds
+	 *
+	 * @see {@link https://docs.etherscan.io/api-endpoints/gastracker#get-estimated-confirmation-time | Etherscan API docs}
+	 */
+	async getEstimatedConfirmationTime(gasPrice: bigint) {
+		const response = await this.callApi({
+			module: "gastracker",
+			action: "gasestimate",
+			gasprice: gasPrice.toString(),
+		});
+		return Integer.parse(response);
+	}
+
+	/**
+	 * Returns the current 'Safe', 'Proposed' and 'Fast' gas prices.
+	 * @returns `GasOracleResponse`
+	 *
+	 * @see {@link https://docs.etherscan.io/api-endpoints/gastracker#get-gas-oracle | Etherscan API docs}
+	 */
+	async getGasOracle() {
+		const response = await this.callApi({
+			module: "gastracker",
+			action: "gasoracle",
+		});
+		return GasOracleResponse.parse(response);
 	}
 
 	async getEtherSupply() {
