@@ -32,6 +32,7 @@ import {
 	ContractCreation,
 } from "./contract";
 import { ContractExecutionStatus, TransactionReceiptStatus } from "./transaction";
+import { BlockAndUncleRewards, ClosestOption, EstimatedTimeToBlockNo } from "./block";
 
 type Primitive = boolean | string | number | undefined | null;
 
@@ -138,47 +139,6 @@ const InternalTransactionByHash = z.object({
 	isError: EnumBoolean,
 	errCode: OptionalString,
 });
-
-const BlockAndUncleRewards = z.object({
-	blockNumber: Integer,
-	timeStamp: TimeStamp,
-	blockMiner: Address,
-	blockReward: BigInt_,
-	uncles: z.array(
-		z
-			.object({
-				miner: Address,
-				unclePosition: Integer,
-				blockreward: BigInt_,
-			})
-			.transform(({ blockreward, ...rest }) => ({ ...rest, blockReward: blockreward })),
-	),
-	uncleInclusionReward: BigInt_,
-});
-
-const EstimatedTimeToBlockNo = z
-	.object({
-		CurrentBlock: Integer,
-		CountdownBlock: Integer,
-		ReamingBlock: Integer,
-		EstimatedTimeInSec: z.number(),
-	})
-	.transform(
-		({
-			CurrentBlock: currentBlock,
-			CountdownBlock: countdownBlock,
-			ReamingBlock: remainingBlock,
-			EstimatedTimeInSec: estimatedTime,
-		}) => ({
-			currentBlock,
-			countdownBlock,
-			remainingBlock,
-			estimatedTime,
-		}),
-	);
-
-const ClosestOption = z.enum(["before", "after"]).default("before");
-type ClosestOption = z.infer<typeof ClosestOption>;
 
 const EventLog = z.object({
 	address: Address,
@@ -740,31 +700,54 @@ export class Client {
 		return TransactionReceiptStatus.parse(response);
 	}
 
+	/**
+	 * Returns the block reward and 'Uncle' block rewards.
+	 * @param blockNumber block number to check block rewards for
+	 * @returns `BlockAndUncleRewards`
+	 *
+	 * @see {@link https://docs.etherscan.io/api-endpoints/blocks#get-block-and-uncle-rewards-by-blockno Etherscan API docs}
+	 */
 	async getBlockAndUncleRewardsByBlockNumber(blockNumber: number) {
 		const response = await this.callApi({
 			module: "block",
 			action: "getblockreward",
-			blockno: Integer.min(0).parse(blockNumber).toString(),
+			blockno: Integer.min(0).parse(blockNumber),
 		});
 		return BlockAndUncleRewards.parse(response);
 	}
 
-	async getEstimatedTimeToBlockNo(blockNumber: number) {
+	/**
+	 * Returns the estimated time remaining, in seconds, until a certain block is mined.
+	 *
+	 * @param blockNumber block number to estimate time remaining to be mined
+	 * @returns `EstimatedTimeToBlockNo`
+	 *
+	 * @see {@link https://docs.etherscan.io/api-endpoints/blocks#get-estimated-block-countdown-time-by-blockno Etherscan API docs}
+	 */
+	async getEstimatedTimeToBlockNumber(blockNumber: number) {
 		const response = await this.callApi({
 			module: "block",
 			action: "getblockcountdown",
-			blockno: Integer.min(0).parse(blockNumber).toString(),
+			blockno: Integer.min(0).parse(blockNumber),
 		});
 		return EstimatedTimeToBlockNo.parse(response);
 	}
 
+	/**
+	 * Returns the block number that was mined at a certain timestamp.
+	 *
+	 * @param timestamp Unix timestamp in seconds.
+	 * @param closest the closest available block to the provided timestamp, either before or after
+	 * @returns closest block number
+	 *
+	 * @see {@link  https://docs.etherscan.io/api-endpoints/blocks#get-estimated-block-countdown-time-by-blockno Etherscan API docs}
+	 */
 	async getBlockNoByTimestamp(timestamp: number, closest?: ClosestOption) {
-		const closestString = ClosestOption.parse(closest);
 		const response = await this.callApi({
 			module: "block",
 			action: "getblocknobytime",
-			timestamp: Integer.min(0).parse(timestamp).toString(),
-			closest: closestString,
+			timestamp: Integer.min(0).parse(timestamp),
+			closest: ClosestOption.optional().parse(closest),
 		});
 		return Integer.parse(response);
 	}
@@ -924,7 +907,7 @@ export class Client {
 		const response = await this.fetch(params);
 		const apiResponse = Response.parse(response);
 		if (apiResponse.status === "0") {
-			throw new Error(apiResponse.message);
+			throw new Error(apiResponse.result);
 		}
 		return apiResponse.result;
 	}
