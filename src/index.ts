@@ -33,6 +33,7 @@ import {
 } from "./contract";
 import { ContractExecutionStatus, TransactionReceiptStatus } from "./transaction";
 import { BlockAndUncleRewards, ClosestOption, EstimatedTimeToBlockNo } from "./block";
+import { Log, GetLogsInput } from "./logs";
 
 type Primitive = boolean | string | number | undefined | null;
 
@@ -72,11 +73,11 @@ export const PaginationOptions = z.object({
 export type PaginationOptions = Partial<z.infer<typeof PaginationOptions>>;
 
 function ensurePaginationOptions(options: PaginationOptions) {
-	const { startBlock, endBlock, page, offset, sort } = options;
+	const { startBlock, endBlock, page, offset, sort } = PaginationOptions.parse(options);
 	return { startblock: startBlock, endblock: endBlock, page, offset, sort };
 }
 
-const LogPaginationOptions = z.object({
+export const LogPaginationOptions = z.object({
 	fromBlock: Integer.min(0).optional(),
 	toBlock: Integer.min(0).optional(),
 	page: Integer.min(1).optional(),
@@ -139,45 +140,6 @@ const InternalTransactionByHash = z.object({
 	isError: EnumBoolean,
 	errCode: OptionalString,
 });
-
-const EventLog = z.object({
-	address: Address,
-	topics: z.array(HexString),
-	data: HexValue,
-	blockNumber: Integer,
-	timeStamp: TimeStamp,
-	gasPrice: BigInt_,
-	gasUsed: BigInt_,
-	logIndex: HexValue,
-	transactionHash: HexValue,
-	transactionIndex: HexValue,
-});
-
-const Operator = z.enum(["and", "or"]);
-export type Operator = z.infer<typeof Operator>;
-
-const Topics = z
-	.object({
-		topic0: HexString,
-	})
-	.or(
-		z
-			.object({
-				topic0: HexString,
-				topic1: HexString,
-				operator01: Operator,
-			})
-			.transform(({ operator01, ...rest }) => ({ ...rest, topic0_1_opr: operator01 })),
-	);
-export type Topics =
-	| {
-			topic0: HexString;
-	  }
-	| {
-			topic0: HexString;
-			topic1: HexString;
-			operator01: Operator;
-	  };
 
 const Ether2Supply = z
 	.object({
@@ -752,39 +714,23 @@ export class Client {
 		return Integer.parse(response);
 	}
 
-	async getEventLogsByAddress(address: string, options: LogPaginationOptions = {}) {
-		const response = await this.callApi({
-			module: "logs",
-			action: "getlogs",
-			address: Address.parse(address),
-			...LogPaginationOptions.parse(options),
-		});
-		return z.array(EventLog).parse(response);
-	}
-
-	async getEventLogsByTopics(topics: Topics, options: LogPaginationOptions = {}) {
-		const response = await this.callApi({
-			module: "logs",
-			action: "getLogs",
-			...Topics.parse(topics),
-			...LogPaginationOptions.parse(options),
-		});
-		return z.array(EventLog).parse(response);
-	}
-
-	async getEventLogsByAddressFilteredByTopics(
-		address: string,
-		topics: Topics,
-		options: LogPaginationOptions = {},
-	) {
+	/**
+	 * Returns the event logs from an address, with optional filtering by block range.
+	 *
+	 * @param input `GetLogInput` object describing event filter
+	 * @param options `LogPaginationOptions`
+	 * @returns array of {@link Log `Log`} objects
+	 *
+	 * @see {@link https://docs.etherscan.io/api-endpoints/logs Etherscan API docs}
+	 */
+	async getLogs(input: GetLogsInput, options: LogPaginationOptions = {}) {
 		const response = await this.callApi({
 			module: "logs",
 			action: "getLogs",
-			address: Address.parse(address),
-			...Topics.parse(topics),
+			...GetLogsInput.parse(input),
 			...LogPaginationOptions.parse(options),
 		});
-		return z.array(EventLog).parse(response);
+		return z.array(Log).parse(response);
 	}
 
 	async getBlockNumber() {
