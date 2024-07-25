@@ -15,7 +15,7 @@ const client = new Client({
 test("get-block-and-uncle-rewards-by-block-number", async () => {
 	await expect(client.getBlockAndUncleRewardsByBlockNumber(2165403)).resolves.toStrictEqual({
 		blockNumber: 2165403,
-		timeStamp: new Date("2016-08-30T05:12:59.000Z"),
+		timeStamp: 1472533979,
 		blockMiner: "0x13A06D3dFe21e0DB5C016C03Ea7D2509f7f8D1e3",
 		blockReward: 5314181600000000000n,
 		uncles: [

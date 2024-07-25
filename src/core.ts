@@ -54,7 +54,7 @@ export type HexString = z.infer<typeof HexString>;
 /**
  * Unix timestamp represented as a number of seconds since the Unix epoch
  */
-export const TimeStamp = z.coerce.number().transform(value => new Date(value * 1000));
+export const TimeStamp = z.coerce.number();
 
 /**
  * Integer string represented as a string of digits
