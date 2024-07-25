@@ -35,6 +35,15 @@ import {
 import { ContractExecutionStatus, TransactionReceiptStatus } from "./transaction";
 import { BlockAndUncleRewards, ClosestOption, EstimatedTimeToBlockNo } from "./block";
 import { Log, GetLogsInput } from "./logs";
+import {
+	UncleBlock,
+	TransactionReceipt,
+	CallParams,
+	EipTransaction,
+	Block,
+	BlockWithTransactions,
+	GetTransactionInput,
+} from "./json-rpc";
 
 type Primitive = boolean | string | number | undefined | null;
 
@@ -238,115 +247,6 @@ const JsonRpcResponseError = z
 
 export const JsonRpcResponse = JsonRpcResponseOk.or(JsonRpcResponseError);
 export type JsonRpcResponse = z.infer<typeof JsonRpcResponse>;
-
-export const Block = z
-	.object({
-		difficulty: BigInt_,
-		extraData: HexString,
-		gasLimit: BigInt_,
-		gasUsed: BigInt_,
-		hash: HexString,
-		logsBloom: HexString,
-		miner: Address,
-		mixHash: HexString,
-		nonce: HexString,
-		number: Integer,
-		parentHash: HexString,
-		receiptsRoot: HexString,
-		sha3Uncles: HexString,
-		size: Integer,
-		stateRoot: HexString,
-		timestamp: TimeStamp,
-		totalDifficulty: BigInt_,
-		transactions: z.array(z.string()),
-		transactionsRoot: HexString,
-		uncles: z.array(HexString),
-	})
-	.or(z.null());
-
-const SignedLegacyTransaction = z.object({
-	type: z.literal("0x0"),
-	nonce: BigInt_,
-	to: Address.or(z.null()),
-	gas: BigInt_,
-	value: BigInt_,
-	input: HexString,
-	gasPrice: BigInt_,
-	chainId: Integer,
-	v: HexValue,
-	r: HexValue,
-	s: HexValue,
-});
-
-const Signed2930Transaction = z.object({
-	type: z.literal(1),
-	chainId: Integer,
-	nonce: HexString,
-	gasPrice: HexString,
-	gasLimit: HexString,
-	to: OptionalAddress,
-	value: Ether,
-	data: HexString.optional(),
-	accessList: z.array(
-		z.object({
-			address: Address,
-			storageKeys: z.array(HexString),
-		}),
-	),
-	v: HexValue,
-	r: HexValue,
-	s: HexValue,
-});
-
-const Signed1559Transaction = z.object({
-	type: z.literal("0x2"),
-	nonce: HexString,
-	gasLimit: HexString,
-	to: OptionalAddress,
-	maxPriorityFeePerGas: HexString,
-	maxFeePerGas: HexString,
-	value: Ether,
-	data: HexString.optional(),
-	accessList: z
-		.array(
-			z.object({
-				address: Address,
-				storageKeys: z.array(HexString),
-			}),
-		)
-		.optional(),
-	chainId: Integer,
-	v: HexValue,
-	r: HexValue,
-	s: HexValue,
-});
-
-export const BlockWithTransactions = z
-	.object({
-		difficulty: BigInt_,
-		extraData: HexString,
-		gasLimit: BigInt_,
-		gasUsed: BigInt_,
-		hash: HexString,
-		logsBloom: HexString,
-		miner: Address,
-		mixHash: HexString,
-		nonce: HexString,
-		number: Integer,
-		parentHash: HexString,
-		receiptsRoot: HexString,
-		sha3Uncles: HexString,
-		size: Integer,
-		stateRoot: HexString,
-		timestamp: TimeStamp,
-		totalDifficulty: BigInt_,
-		transactions: z.array(
-			SignedLegacyTransaction.or(Signed2930Transaction).or(Signed1559Transaction),
-		),
-		transactionsRoot: HexString,
-		uncles: z.array(HexString),
-	})
-	.or(z.null());
 
 const NodeCount = z
 	.object({
@@ -738,6 +638,10 @@ export class Client {
 		return z.array(Log).parse(response);
 	}
 
+	/**
+	 * Returns the number of most recent block
+	 * @returns block number
+	 */
 	async getBlockNumber() {
 		const response = await this.callJsonRpc({
 			action: "eth_blockNumber",
@@ -745,26 +649,195 @@ export class Client {
 		return Integer.parse(response);
 	}
 
-	async getBlockByNumber(blockTag: BlockTag) {
-		const tag = BlockTag.parse(blockTag);
+	/**
+	 * Returns information about a block by block number.
+	 *
+	 * @param block block number or tag
+	 * @returns `Block` object
+	 */
+	async getBlock(block: BlockIdentifier) {
 		const response = await this.callJsonRpc({
 			module: "proxy",
 			action: "eth_getBlockByNumber",
-			tag,
+			tag: serializeBlockIdentifier(block),
 			boolean: "false",
 		});
 		return Block.parse(response);
 	}
 
-	async getBlockByNumberWithTransactions(blockTag: BlockTag) {
-		const tag = BlockTag.parse(blockTag);
+	/**
+	 * Returns information about a block by block number.
+	 *
+	 * @param block block number or tag
+	 * @returns `Block` object
+	 */
+	async getBlockWithTransactions(block: BlockIdentifier) {
 		const response = await this.callJsonRpc({
 			module: "proxy",
 			action: "eth_getBlockByNumber",
-			tag,
+			tag: serializeBlockIdentifier(block),
 			boolean: "true",
 		});
 		return BlockWithTransactions.parse(response);
+	}
+
+	/**
+	 * Returns information about a uncle block by block number or tag.
+	 *
+	 * @param block block number or tag
+	 * @returns `UncleBlock` object
+	 */
+	async getUncleBlock(block: BlockIdentifier, index: number) {
+		const idx = Integer.min(0).parse(index);
+		const response = await this.callJsonRpc({
+			module: "proxy",
+			action: "eth_getUncleByBlockNumberAndIndex",
+			tag: serializeBlockIdentifier(block),
+			index: `0x${idx.toString(16)}`,
+		});
+		return UncleBlock.parse(response);
+	}
+
+	/**
+	 * Returns the number of transactions by a block number or tag.
+	 *
+	 * @param block block number or tag
+	 * @returns number of transactions
+	 */
+	async getTransactionCountByBlock(block: BlockIdentifier) {
+		const response = await this.callJsonRpc({
+			module: "proxy",
+			action: "eth_getBlockTransactionCountByNumber",
+			tag: serializeBlockIdentifier(block),
+		});
+		return Integer.parse(response);
+	}
+
+	/**
+	 * Returns the number of transactions by a block number or tag.
+	 *
+	 * @param block block number or tag
+	 * @returns number of transactions
+	 */
+	async getTransaction(input_: GetTransactionInput) {
+		const input = GetTransactionInput.parse(input_);
+		if ("hash" in input) {
+			const response = await this.callJsonRpc({
+				module: "proxy",
+				action: "eth_getTransactionByHash",
+				txhash: input.hash,
+			});
+			return EipTransaction.parse(response);
+		}
+		const response = await this.callJsonRpc({
+			module: "proxy",
+			action: "eth_getTransactionByBlockNumberAndIndex",
+			tag: typeof input.block === "string" ? input.block : `0x${input.block.toString(16)}`,
+			index: `0x${input.index.toString(16)}`,
+		});
+		return EipTransaction.parse(response);
+	}
+
+	/**
+	 * Returns the number of transactions performed by an address.
+	 *
+	 * @param address address to get transaction count
+	 * @param tag  pre-defined block parameter, either `"earliest"`, `"pending"` or `"latest"`
+	 * @returns number of transactions
+	 */
+	async getTransactionCountByAddress(address: string, tag?: Tag) {
+		const response = await this.callJsonRpc({
+			module: "proxy",
+			action: "eth_getTransactionCount",
+			address: Address.parse(address),
+			tag: Tag.default("latest").parse(tag),
+		});
+		return Integer.parse(response);
+	}
+
+	/**
+	 * Returns the receipt of a transaction by transaction hash.
+	 *
+	 * @param txHash hash of the transaction
+	 * @returns `TransactionReceipt`
+	 */
+	async getTransactionReceipt(txHash: string) {
+		const response = await this.callJsonRpc({
+			module: "proxy",
+			action: "eth_getTransactionReceipt",
+			txhash: HexString.parse(txHash),
+		});
+		return TransactionReceipt.parse(response);
+	}
+
+	/**
+	 * Executes a new message call immediately without creating a transaction on the block chain.
+	 *
+	 * @param input `CallParams` object
+	 * @param tag  pre-defined block parameter, either `"earliest"`, `"pending"` or `"latest"`
+	 * @returns result of the call in hex
+	 */
+	async call(input: CallParams, tag?: Tag) {
+		const { value, gas, gasPrice, ...params } = CallParams.parse(input);
+		const response = await this.callJsonRpc({
+			module: "proxy",
+			action: "eth_call",
+			value: value ? `0x${value.toString(16)}` : undefined,
+			gas: gas ? `0x${gas.toString(16)}` : undefined,
+			gasPrice: gasPrice ? `0x${gasPrice.toString(16)}` : undefined,
+			...params,
+			tag: Tag.default("latest").parse(tag),
+		});
+		return HexValue.parse(response);
+	}
+
+	/**
+	 * Returns code at a given address.
+	 *
+	 * @param address address to get code
+	 * @param tag  pre-defined block parameter, either `"earliest"`, `"pending"` or `"latest"`
+	 * @returns bytecode at address
+	 */
+	async getCode(address: string, tag?: Tag) {
+		const response = await this.callJsonRpc({
+			module: "proxy",
+			action: "eth_getCode",
+			address: Address.parse(address),
+			tag: Tag.default("latest").parse(tag),
+		});
+		return HexString.parse(response);
+	}
+
+	/**
+	 * Returns the current price per gas in wei.
+	 *
+	 * @returns gas price in wei
+	 */
+	async getGasPrice() {
+		const response = await this.callJsonRpc({
+			module: "proxy",
+			action: "eth_gasPrice",
+		});
+		return BigInt_.parse(response);
+	}
+
+	/**
+	 * Makes a call or transaction, which won't be added to the blockchain and returns the used gas.
+	 *
+	 * @param callParams `EstimateGasParams` object
+	 * @returns gas used
+	 */
+	async estimateGas(callParams: CallParams) {
+		const { value, gas, gasPrice, ...params } = CallParams.parse(callParams);
+		const response = await this.callJsonRpc({
+			module: "proxy",
+			action: "eth_call",
+			value: value ? `0x${value.toString(16)}` : undefined,
+			gas: gas ? `0x${gas.toString(16)}` : undefined,
+			gasPrice: gasPrice ? `0x${gasPrice.toString(16)}` : undefined,
+			...params,
+		});
+		return BigInt_.parse(response);
 	}
 
 	async getEtherSupply() {
