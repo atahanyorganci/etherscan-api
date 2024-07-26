@@ -6,22 +6,22 @@ cache_dir     := test_dir / "cache"
 cache_archive := "cache.tar.gz"
 
 format:
-    bun run format
+    pnpm run format
 
 lint:
-    bun run lint
+    pnpm run lint
 
 check:
-    bun run check
+    pnpm run check
 
 test: decompress
-    bun run test
+    pnpm run test
 
 build:
-    bun run build
+    pnpm run build
 
 attw:
-    bun run attw
+    pnpm run attw
 
 compress:
     #!/usr/bin/env bash
@@ -63,5 +63,3 @@ is-clean:
     git commit -m "{{ NEW_VERSION }}"
     git tag 'v{{ NEW_VERSION }}'
 
-update-test-data:
-    REMOTE=true PERSIST=true bun run test
