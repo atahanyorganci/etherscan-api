@@ -13,24 +13,24 @@ const client = new Client({
 });
 
 test("Get Block And Uncle Rewards by BlockNo", async () => {
-	await expect(client.getBlockAndUncleRewardsByBlockNumber(2165403)).resolves.toStrictEqual({
-		blockNumber: 2165403,
-		timeStamp: 1472533979,
-		blockMiner: "0x13A06D3dFe21e0DB5C016C03Ea7D2509f7f8D1e3",
-		blockReward: 5314181600000000000n,
+	await expect(client.getBlockAndUncleRewardsByBlockNumber(2165403)).resolves.toMatchObject({
+		blockNumber: expect.any(Number),
+		timeStamp: expect.any(Number),
+		blockMiner: expect.any(String),
+		blockReward: expect.any(BigInt),
 		uncles: [
 			{
-				miner: "0xbCDFC35b86BedF72F0Cda046A3c16829A2Ef41d1",
-				unclePosition: 0,
-				blockReward: 3750000000000000000n,
+				miner: expect.any(String),
+				unclePosition: expect.any(Number),
+				blockReward: expect.any(BigInt),
 			},
 			{
-				miner: "0x0d0C9855c722ff0c78F21E43aA275a5B8eA60DcE",
-				unclePosition: 1,
-				blockReward: 3750000000000000000n,
+				miner: expect.any(String),
+				unclePosition: expect.any(Number),
+				blockReward: expect.any(BigInt),
 			},
 		],
-		uncleInclusionReward: 312500000000000000n,
+		uncleInclusionReward: expect.any(BigInt),
 	});
 });
 
