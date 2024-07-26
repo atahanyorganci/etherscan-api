@@ -5,25 +5,25 @@ import {
 	Erc20Transfer,
 	Erc721Transfer,
 	Erc1155Transfer,
-	GetBalancesInput,
-	GetBalancesResult,
-	GetTokenTransfersInput,
-	GetValidatedBlockOptions,
+	GetBalancesParams,
+	GetTokenTransfersParams,
 	ValidatedBlock,
+	GetBalancesResponse,
+	Transaction,
+	InternalTransaction,
+	InternalTransactionsOfTransaction,
+	GetValidatedBlockOptions,
+	BeaconChainWithdrawal,
 } from "./account";
 import {
 	Address,
 	Wei,
 	type BlockIdentifier,
-	EnumBoolean,
 	Ether,
 	HexString,
 	HexValue,
 	Integer,
-	OptionalAddress,
-	OptionalString,
 	serializeBlockIdentifier,
-	TimeStamp,
 } from "./core";
 import {
 	AbiStr,
@@ -105,62 +105,6 @@ export const LogPaginationOptions = z.object({
 });
 export type LogPaginationOptions = Partial<z.infer<typeof LogPaginationOptions>>;
 
-const Transaction = z.object({
-	blockNumber: Integer,
-	timeStamp: TimeStamp,
-	hash: z.string(),
-	nonce: Integer,
-	blockHash: z.string(),
-	transactionIndex: Integer,
-	from: Address,
-	to: OptionalAddress,
-	value: Ether,
-	gas: Wei,
-	gasPrice: Wei,
-	isError: EnumBoolean,
-	txreceipt_status: EnumBoolean,
-	input: HexValue,
-	contractAddress: OptionalAddress,
-	cumulativeGasUsed: Wei,
-	gasUsed: Wei,
-	confirmations: Integer,
-	methodId: HexValue,
-	functionName: OptionalString,
-});
-export type Transaction = z.infer<typeof Transaction>;
-
-const InternalTransaction = z.object({
-	blockNumber: Integer,
-	timeStamp: TimeStamp,
-	hash: z.string(),
-	from: Address,
-	to: OptionalAddress,
-	value: Ether,
-	contractAddress: OptionalAddress,
-	input: OptionalString.or(HexValue),
-	type: z.enum(["call", "create"]),
-	gas: Wei,
-	gasUsed: Wei,
-	traceId: z.string(),
-	isError: EnumBoolean,
-	errCode: OptionalString,
-});
-
-const InternalTransactionByHash = z.object({
-	blockNumber: Integer,
-	timeStamp: TimeStamp,
-	from: Address,
-	to: OptionalAddress,
-	value: Ether,
-	contractAddress: OptionalAddress,
-	input: HexValue.or(OptionalString),
-	type: z.enum(["call", "create"]),
-	gas: Wei,
-	gasUsed: Wei,
-	isError: EnumBoolean,
-	errCode: OptionalString,
-});
-
 type JsonRpcResponseOk = { ok: true; result: unknown };
 const JsonRpcResponseOk = z
 	.object({
@@ -186,7 +130,6 @@ export const JsonRpcResponse = JsonRpcResponseOk.or(JsonRpcResponseError);
 export type JsonRpcResponse = z.infer<typeof JsonRpcResponse>;
 
 export const Tag = z.enum(["earliest", "pending", "latest"]);
-
 /**
  * Pre-defined block parameter, either `"finalized"`, `"earliest"`, `"pending"` or `"latest"`
  */
@@ -230,7 +173,7 @@ export class Client {
 	 * Returns the Ether balance of a given address.
 	 *
 	 * @param address address to check for balance
-	 * @param tag pre-defined block parameter, either `"finalized"`, `"earliest"`, `"pending"` or `"latest"`
+	 * @param tag {@link Tag `Tag`}
 	 * @returns balance in wei
 	 *
 	 * @see {@link https://docs.etherscan.io/api-endpoints/accounts#get-ether-balance-for-a-single-address | Etherscan API docs}
@@ -248,8 +191,8 @@ export class Client {
 	/**
 	 * Returns the balance of the accounts from a list of addresses.
 	 *
-	 * @param addresses  addresses to check for balance, up to **20 addresses** per call
-	 * @param tag block tag
+	 * @param addresses addresses to check for balance, up to **20 addresses** per call
+	 * @param tag {@link Tag `Tag`}
 	 * @returns balances in wei
 	 *
 	 * @see {@link https://docs.etherscan.io/api-endpoints/accounts#get-ether-balance-for-multiple-addresses-in-a-single-call | Etherscan API docs}
@@ -258,18 +201,19 @@ export class Client {
 		const result = await this.callApi({
 			module: "account",
 			action: "balancemulti",
-			address: GetBalancesInput.parse(addresses).join(","),
+			address: GetBalancesParams.parse(addresses).join(","),
 			tag: Tag.default("latest").parse(tag),
 		});
-		return GetBalancesResult.parse(result);
+		return GetBalancesResponse.parse(result);
 	}
 
 	/**
 	 * Returns the list of transactions performed by an address, with optional pagination.
+	 * Note: Transactions returned by Etherscan are different from those returned by JSON-RPC.
 	 *
 	 * @param address address to list transactions for
-	 * @param options pagination options {@link PaginationOptions `PaginationOptions`}
-	 * @returns list of transactions
+	 * @param options {@link PaginationOptions `PaginationOptions`}
+	 * @returns array of {@link Transaction `Transaction`} objects
 	 *
 	 * @see {@link https://docs.etherscan.io/api-endpoints/accounts#get-a-list-of-normal-transactions-by-address | Etherscan API docs}
 	 */
@@ -287,8 +231,8 @@ export class Client {
 	 * Returns the list of transactions performed by an address, with optional pagination.
 	 *
 	 * @param address address to list transactions for
-	 * @param options pagination options {@link PaginationOptions `PaginationOptions`}
-	 * @returns list of internal transactions
+	 * @param options {@link PaginationOptions `PaginationOptions`}
+	 * @returns array of {@link InternalTransaction `InternalTransaction`} objects
 	 *
 	 * @see {@link https://docs.etherscan.io/api-endpoints/accounts#get-a-list-of-normal-transactions-by-address | Etherscan API docs}
 	 */
@@ -305,18 +249,19 @@ export class Client {
 	/**
 	 * Returns the list of internal transactions performed within a transaction.
 	 *
-	 * @param hash hash to check for internal transactions
-	 * @returns list of internal transactions
+	 * @param txHash transaction hash to check for internal transactions
+	 * @returns array of {@link InternalTransactionsOfTransaction `InternalTransactionsOfTransaction`} objects
 	 *
 	 * @see {@link https://docs.etherscan.io/api-endpoints/accounts#get-internal-transactions-by-transaction-hash | Etherscan API docs}
 	 */
-	async getInternalTransactionByTransaction(hash: string) {
+	async getInternalTransactionsInTransaction(txHash: string, options: PaginationOptions = {}) {
 		const result = await this.callApi({
 			module: "account",
 			action: "txlistinternal",
-			txhash: HexString.parse(hash),
+			txhash: HexString.parse(txHash),
+			...ensurePaginationOptions(options),
 		});
-		return z.array(InternalTransactionByHash).parse(result);
+		return z.array(InternalTransactionsOfTransaction).parse(result);
 	}
 
 	/**
@@ -325,12 +270,12 @@ export class Client {
 	 * @param input specify `address` for filter based on account, specify `contractAddress` to filter by
 	 * ERC20 token, specify both to filter by account and ERC20 token
 	 * @param options pagination options {@link PaginationOptions `PaginationOptions`}
-	 * @returns list of {@link Erc20Transfer `Erc20Transfer`}s
+	 * @returns array of {@link Erc20Transfer `Erc20Transfer`}s
 	 *
 	 * @see {@link https://docs.etherscan.io/api-endpoints/accounts#get-a-list-of-erc20-token-transfer-events-by-address | Etherscan API docs}
 	 */
-	async getErc20Transfers(input: GetTokenTransfersInput, options: PaginationOptions = {}) {
-		const { address, contractAddress } = GetTokenTransfersInput.parse(input);
+	async getErc20Transfers(input: GetTokenTransfersParams, options: PaginationOptions = {}) {
+		const { address, contractAddress } = GetTokenTransfersParams.parse(input);
 		const result = await this.callApi({
 			module: "account",
 			action: "tokentx",
@@ -347,12 +292,12 @@ export class Client {
 	 * @param input specify `address` for filter based on account, specify `contractAddress` to filter by
 	 * ERC721 token, specify both to filter by account and ERC721 token
 	 * @param options pagination options {@link PaginationOptions `PaginationOptions`}
-	 * @returns list of {@link Erc721Transfer `Erc721Transfer`}s
+	 * @returns array of {@link Erc721Transfer `Erc721Transfer`}s
 	 *
 	 * @see {@link https://docs.etherscan.io/api-endpoints/accounts#get-a-list-of-erc721-token-transfer-events-by-address | Etherscan API docs}
 	 */
-	async getErc721Transfers(input: GetTokenTransfersInput, options: PaginationOptions = {}) {
-		const { address, contractAddress } = GetTokenTransfersInput.parse(input);
+	async getErc721Transfers(input: GetTokenTransfersParams, options: PaginationOptions = {}) {
+		const { address, contractAddress } = GetTokenTransfersParams.parse(input);
 		const result = await this.callApi({
 			module: "account",
 			action: "tokennfttx",
@@ -373,8 +318,8 @@ export class Client {
 	 *
 	 * @see {@link https://docs.etherscan.io/api-endpoints/accounts#get-a-list-of-erc1155-token-transfer-events-by-address | Etherscan API docs}
 	 */
-	async getErc1155Transfers(input: GetTokenTransfersInput, options: PaginationOptions = {}) {
-		const { address, contractAddress } = GetTokenTransfersInput.parse(input);
+	async getErc1155Transfers(input: GetTokenTransfersParams, options: PaginationOptions = {}) {
+		const { address, contractAddress } = GetTokenTransfersParams.parse(input);
 		const result = await this.callApi({
 			module: "account",
 			action: "token1155tx",
@@ -395,13 +340,35 @@ export class Client {
 	 * @see {@link https://docs.etherscan.io/api-endpoints/accounts#get-list-of-blocks-validated-by-address Etherscan API docs}
 	 */
 	async getBlocksValidatedByAddress(address: string, options: GetValidatedBlockOptions = {}) {
+		const { blockType, offset, page } = GetValidatedBlockOptions.parse(options);
 		const result = await this.callApi({
 			module: "account",
 			action: "getminedblocks",
 			address: Address.parse(address),
-			...GetValidatedBlockOptions.parse(options),
+			blocktype: blockType,
+			offset,
+			page,
 		});
 		return z.array(ValidatedBlock).parse(result);
+	}
+
+	/**
+	 * Returns the beacon chain withdrawals made to an address.
+	 *
+	 * @param address validator address
+	 * @param options {@link PaginationOptions `PaginationOptions`}
+	 * @returns array of {@link BeaconChainWithdrawal `BeaconChainWithdrawal`}
+	 *
+	 * @see {@link https://docs.etherscan.io/api-endpoints/accounts#get-beacon-chain-withdrawals-by-address-and-block-range Etherscan API docs}
+	 */
+	async getBeaconChainWithdrawals(address: string, options: PaginationOptions = {}) {
+		const result = await this.callApi({
+			module: "account",
+			action: "txsBeaconWithdrawal",
+			address: Address.parse(address),
+			...ensurePaginationOptions(options),
+		});
+		return z.array(BeaconChainWithdrawal).parse(result);
 	}
 
 	/**

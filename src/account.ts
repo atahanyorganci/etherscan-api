@@ -1,13 +1,82 @@
 import { z } from "zod";
-import { Address, Wei, Ether, Integer, TimeStamp } from "./core";
+import {
+	Address,
+	Wei,
+	Ether,
+	Integer,
+	TimeStamp,
+	OptionalAddress,
+	EnumBoolean,
+	HexValue,
+	OptionalString,
+	HexString,
+} from "./core";
 
-export const GetBalancesInput = z.array(Address).max(20);
-export type GetBalancesInput = z.infer<typeof GetBalancesInput>;
+export const GetBalancesParams = z.array(Address).max(20);
+export type GetBalancesParams = z.infer<typeof GetBalancesParams>;
 
-export const GetBalancesResult = z.array(z.object({ account: Address, balance: Ether }));
-export type GetBalancesResult = z.infer<typeof GetBalancesResult>;
+export const GetBalancesResponse = z.array(z.object({ account: Address, balance: Ether }));
+export type GetBalancesResponse = z.infer<typeof GetBalancesResponse>;
 
-export const GetTokenTransfersInput = z.union([
+export const Transaction = z.object({
+	blockNumber: Integer,
+	blockHash: HexString,
+	timeStamp: TimeStamp,
+	hash: HexString,
+	nonce: Integer,
+	transactionIndex: Integer,
+	from: Address,
+	to: OptionalAddress,
+	value: Ether,
+	gas: Wei,
+	gasPrice: Wei,
+	input: HexValue,
+	methodId: HexValue,
+	functionName: OptionalString,
+	contractAddress: OptionalAddress,
+	cumulativeGasUsed: Wei,
+	txreceipt_status: z.enum(["", "0", "1"]).transform(status => status === "1"),
+	gasUsed: Wei,
+	confirmations: Integer,
+	isError: EnumBoolean,
+});
+export type Transaction = z.infer<typeof Transaction>;
+
+export const InternalTransaction = z.object({
+	blockNumber: Integer,
+	timeStamp: TimeStamp,
+	hash: z.string(),
+	from: Address,
+	to: OptionalAddress,
+	value: Ether,
+	contractAddress: OptionalAddress,
+	input: OptionalString.or(HexValue),
+	type: z.enum(["call", "create"]),
+	gas: Wei,
+	gasUsed: Wei,
+	traceId: z.string(),
+	isError: EnumBoolean,
+	errCode: OptionalString,
+});
+export type InternalTransaction = z.infer<typeof InternalTransaction>;
+
+export const InternalTransactionsOfTransaction = z.object({
+	blockNumber: Integer,
+	timeStamp: TimeStamp,
+	from: Address,
+	to: OptionalAddress,
+	value: Ether,
+	contractAddress: OptionalAddress,
+	input: HexValue.or(OptionalString),
+	type: z.enum(["call", "create"]),
+	gas: Wei,
+	gasUsed: Wei,
+	isError: EnumBoolean,
+	errCode: OptionalString,
+});
+export type InternalTransactionsOfTransaction = z.infer<typeof InternalTransactionsOfTransaction>;
+
+export const GetTokenTransfersParams = z.union([
 	z.object({
 		address: Address,
 		contractAddress: Address.optional(),
@@ -21,7 +90,7 @@ export const GetTokenTransfersInput = z.union([
 		contractAddress: Address,
 	}),
 ]);
-export type GetTokenTransfersInput = z.infer<typeof GetTokenTransfersInput>;
+export type GetTokenTransfersParams = z.infer<typeof GetTokenTransfersParams>;
 
 export const Erc20Transfer = z.object({
 	blockNumber: Integer,
@@ -92,13 +161,11 @@ export const Erc1155Transfer = z.object({
 });
 export type Erc1155Transfer = z.infer<typeof Erc1155Transfer>;
 
-export const GetValidatedBlockOptions = z
-	.object({
-		blockType: z.enum(["blocks", "uncles"]).optional(),
-		page: z.number().int().min(1).optional(),
-		offset: z.number().int().min(1).max(10000).optional(),
-	})
-	.transform(({ blockType, page, offset }) => ({ blocktype: blockType, page, offset }));
+export const GetValidatedBlockOptions = z.object({
+	blockType: z.enum(["blocks", "uncles"]).optional(),
+	page: z.number().int().min(1).optional(),
+	offset: z.number().int().min(1).max(10000).optional(),
+});
 export type GetValidatedBlockOptions = Partial<z.infer<typeof GetValidatedBlockOptions>>;
 
 export const ValidatedBlock = z.object({
@@ -107,3 +174,15 @@ export const ValidatedBlock = z.object({
 	blockReward: Wei,
 });
 export type ValidatedBlock = z.infer<typeof ValidatedBlock>;
+
+export const BeaconChainWithdrawal = z
+	.object({
+		withdrawalIndex: Integer,
+		validatorIndex: Integer,
+		address: Address,
+		amount: Wei,
+		blockNumber: Integer,
+		timestamp: TimeStamp,
+	})
+	.transform(({ timestamp, ...rest }) => ({ timeStamp: timestamp, ...rest }));
+export type BeaconChainWithdrawal = z.infer<typeof BeaconChainWithdrawal>;
