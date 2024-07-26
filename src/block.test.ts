@@ -40,5 +40,5 @@ test("Get Estimated Block Countdown Time by BlockNo", async () => {
 });
 
 test("Get Block Number by Timestamp", async () => {
-	await expect(client.getBlockNoByTimestamp(1721899160)).resolves.toBeDefined();
+	await expect(client.getBlockNoByTimestamp(1578638524, "before")).resolves.toBeDefined();
 });
