@@ -131,7 +131,7 @@ const MultiFileSourceCode = z
 		}),
 	);
 
-export const ContractSourceCode = z
+export const VerifiedContractSourceCode = z
 	.object({
 		SourceCode: MultiFileSourceCode.or(z.string()),
 		ABI: AbiStr,
@@ -178,19 +178,21 @@ export const ContractSourceCode = z
 			swarmSource,
 		}),
 	);
-export type ContractSourceCode = z.infer<typeof ContractSourceCode>;
+export type VerifiedContractSourceCode = z.infer<typeof VerifiedContractSourceCode>;
 
-export const NotContract = z
+export const UnverifiedContract = z
 	.object({
 		ABI: z.string(),
 	})
 	.refine(value => value.ABI === "Contract source code not verified")
 	.transform(() => undefined);
+export type UnverifiedContract = z.infer<typeof UnverifiedContract>;
 
-export const ContractSourceCodeResponse = NotContract.or(ContractSourceCode);
+export const ContractSourceCodeResponse = UnverifiedContract.or(VerifiedContractSourceCode);
+export type ContractSourceCodeResponse = z.infer<typeof ContractSourceCodeResponse>;
 
-export const GetContractCreationInput = z.array(Address).min(1).max(5);
-export type GetContractCreationInput = z.infer<typeof GetContractCreationInput>;
+export const GetContractCreationParams = z.array(Address).min(1).max(5);
+export type GetContractCreationParams = z.infer<typeof GetContractCreationParams>;
 
 export const ContractCreation = z.object({
 	contractAddress: Address,

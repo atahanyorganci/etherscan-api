@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { Address, HexString, HexValue, Integer, TimeStamp, Wei } from "./core";
+import { Address, HexString, HexValue, Integer, Timestamp, Wei } from "./core";
 
 export const Operator = z.enum(["and", "or"]);
 export type Operator = z.infer<typeof Operator>;
 
-export const GetLogsInput = z
+export const GetLogsParams = z
 	.object({
 		address: z.string().optional(),
 		topic0: HexString,
@@ -22,18 +22,20 @@ export const GetLogsInput = z
 			address: z.string(),
 		}),
 	);
-export type GetLogsInput = z.infer<typeof GetLogsInput>;
+export type GetLogsParams = z.infer<typeof GetLogsParams>;
 
-export const Log = z.object({
-	address: Address,
-	topics: z.array(HexString),
-	data: HexValue,
-	blockNumber: Integer,
-	timeStamp: TimeStamp,
-	gasPrice: Wei,
-	gasUsed: Wei,
-	logIndex: HexValue,
-	transactionHash: HexValue,
-	transactionIndex: HexValue,
-});
+export const Log = z
+	.object({
+		address: Address,
+		topics: z.array(HexString),
+		data: HexValue,
+		blockNumber: Integer,
+		timeStamp: Timestamp,
+		gasPrice: Wei,
+		gasUsed: Wei,
+		logIndex: HexValue,
+		transactionHash: HexValue,
+		transactionIndex: HexValue,
+	})
+	.transform(({ timeStamp, ...rest }) => ({ timestamp: timeStamp, ...rest }));
 export type Log = z.infer<typeof Log>;

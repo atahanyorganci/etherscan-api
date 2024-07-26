@@ -1,25 +1,27 @@
 import { z } from "zod";
-import { Integer, TimeStamp, Address, Wei } from "./core";
+import { Address, Integer, Timestamp, Wei } from "./core";
 
-export const BlockAndUncleRewards = z.object({
-	blockNumber: Integer,
-	timeStamp: TimeStamp,
-	blockMiner: Address,
-	blockReward: Wei,
-	uncles: z.array(
-		z
-			.object({
-				miner: Address,
-				unclePosition: Integer.min(0),
-				blockreward: Wei,
-			})
-			.transform(({ blockreward, ...rest }) => ({ ...rest, blockReward: blockreward })),
-	),
-	uncleInclusionReward: Wei,
-});
+export const BlockAndUncleRewards = z
+	.object({
+		blockNumber: Integer,
+		timeStamp: Timestamp,
+		blockMiner: Address,
+		blockReward: Wei,
+		uncles: z.array(
+			z
+				.object({
+					miner: Address,
+					unclePosition: Integer.min(0),
+					blockreward: Wei,
+				})
+				.transform(({ blockreward, ...rest }) => ({ ...rest, blockReward: blockreward })),
+		),
+		uncleInclusionReward: Wei,
+	})
+	.transform(({ timeStamp: timestamp, ...rest }) => ({ timestamp, ...rest }));
 export type BlockAndUncleRewards = z.infer<typeof BlockAndUncleRewards>;
 
-export const EstimatedTimeToBlockNo = z
+export const EstimatedTimeToBlockNumber = z
 	.object({
 		CurrentBlock: Integer,
 		CountdownBlock: Integer,
@@ -39,7 +41,7 @@ export const EstimatedTimeToBlockNo = z
 			estimatedTime,
 		}),
 	);
-export type EstimatedTimeToBlockNo = z.infer<typeof EstimatedTimeToBlockNo>;
+export type EstimatedTimeToBlockNumber = z.infer<typeof EstimatedTimeToBlockNumber>;
 
 export const ClosestOption = z.enum(["before", "after"]);
 export type ClosestOption = z.infer<typeof ClosestOption>;

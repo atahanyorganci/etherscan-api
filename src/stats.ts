@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DateString, Ether, Integer, TimeStamp, Wei } from "./core";
+import { DateString, Ether, Integer, Timestamp, Wei } from "./core";
 
 export const Ether2Supply = z
 	.object({
@@ -26,21 +26,21 @@ export type Ether2Supply = z.infer<typeof Ether2Supply>;
 export const EtherPriceResponse = z
 	.object({
 		ethbtc: Ether,
-		ethbtc_timestamp: TimeStamp,
+		ethbtc_timestamp: Timestamp,
 		ethusd: Ether,
-		ethusd_timestamp: TimeStamp,
+		ethusd_timestamp: Timestamp,
 	})
 	.transform(
 		({
 			ethbtc: eth2btc,
-			ethbtc_timestamp: eth2btcTimeStamp,
+			ethbtc_timestamp: eth2btcTimestamp,
 			ethusd: eth2usd,
-			ethusd_timestamp: eth2usdTimeStamp,
+			ethusd_timestamp: eth2usdTimestamp,
 		}) => ({
 			eth2btc,
-			eth2btcTimeStamp,
+			eth2btcTimestamp,
 			eth2usd,
-			eth2usdTimeStamp,
+			eth2usdTimestamp,
 		}),
 	);
 export type EtherPriceResponse = z.infer<typeof EtherPriceResponse>;

@@ -28,9 +28,9 @@ test("Get Total Supply of Ether 2", async () => {
 test("Get Ether Last Price", async () => {
 	await expect(client.getLastEtherPrice()).resolves.toMatchObject({
 		eth2btc: expect.any(BigInt),
-		eth2btcTimeStamp: expect.any(Number),
+		eth2btcTimestamp: expect.any(Number),
 		eth2usd: expect.any(BigInt),
-		eth2usdTimeStamp: expect.any(Number),
+		eth2usdTimestamp: expect.any(Number),
 	});
 });
 

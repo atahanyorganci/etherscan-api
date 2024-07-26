@@ -15,7 +15,7 @@ const client = new Client({
 test("Get Block And Uncle Rewards by BlockNo", async () => {
 	await expect(client.getBlockAndUncleRewardsByBlockNumber(2165403)).resolves.toMatchObject({
 		blockNumber: expect.any(Number),
-		timeStamp: expect.any(Number),
+		timestamp: expect.any(Number),
 		blockMiner: expect.any(String),
 		blockReward: expect.any(BigInt),
 		uncles: [
@@ -40,5 +40,5 @@ test("Get Estimated Block Countdown Time by BlockNo", async () => {
 });
 
 test("Get Block Number by Timestamp", async () => {
-	await expect(client.getBlockNoByTimestamp(1578638524, "before")).resolves.toBeDefined();
+	await expect(client.getBlockNumberByTimestamp(1578638524, "before")).resolves.toBeDefined();
 });

@@ -54,7 +54,7 @@ export type HexString = z.infer<typeof HexString>;
 /**
  * Unix timestamp represented as a number of seconds since the Unix epoch
  */
-export const TimeStamp = z.coerce.number();
+export const Timestamp = z.coerce.number();
 
 /**
  * Integer string represented as a string of digits
@@ -94,8 +94,8 @@ export const BlockIdentifier = BlockTag.or(Integer.min(0));
  */
 export type BlockIdentifier = z.infer<typeof BlockIdentifier>;
 
-export function serializeBlockIdentifier(block: BlockIdentifier): string {
-	const identifier = BlockIdentifier.parse(block);
+export function ensureBlockIdentifier(block?: BlockIdentifier): string {
+	const identifier = BlockIdentifier.default("latest").parse(block);
 	return typeof identifier === "number" ? `0x${identifier.toString(16)}` : identifier;
 }
 

@@ -76,8 +76,8 @@ describe("JSON-RPC API", () => {
 	});
 
 	test("eth_getBlockTransactionCountByNumber", async () => {
-		await expect(client.getTransactionCountByBlock(0x10fb78)).resolves.toBe(0x3);
-		await expect(client.getTransactionCountByBlock("latest")).resolves.toBeGreaterThan(0);
+		await expect(client.getBlockTransactionCount(0x10fb78)).resolves.toBe(0x3);
+		await expect(client.getBlockTransactionCount("latest")).resolves.toBeGreaterThan(0);
 	});
 
 	test("eth_getTransactionByHash", async () => {
@@ -99,13 +99,13 @@ describe("JSON-RPC API", () => {
 
 	test("eth_getTransactionCount", async () => {
 		await expect(
-			client.getTransactionCountByAddress("0x6B182919cAAaC95272c45bfC61ec418d0E301140"),
+			client.getAccountTransactionCount("0x6B182919cAAaC95272c45bfC61ec418d0E301140"),
 		).resolves.toBeDefined();
 		await expect(
-			client.getTransactionCountByAddress("0x6B182919cAAaC95272c45bfC61ec418d0E301140", "latest"),
+			client.getAccountTransactionCount("0x6B182919cAAaC95272c45bfC61ec418d0E301140", "latest"),
 		).resolves.toBeDefined();
 		await expect(
-			client.getTransactionCountByAddress("0x6B182919cAAaC95272c45bfC61ec418d0E301140", "pending"),
+			client.getAccountTransactionCount("0x6B182919cAAaC95272c45bfC61ec418d0E301140", "pending"),
 		).resolves.toBeDefined();
 	});
 
@@ -132,11 +132,13 @@ describe("JSON-RPC API", () => {
 			}),
 		).resolves.toBeDefined();
 		await expect(
-			client.call({
-				to: "0xAEEF46DB4855E25702F8237E8f403FddcaF931C0",
-				data: "0x70a08231000000000000000000000000e16359506c028e51f16be38986ec5746251e9724",
-				tag: "latest",
-			}),
+			client.call(
+				{
+					to: "0xAEEF46DB4855E25702F8237E8f403FddcaF931C0",
+					data: "0x70a08231000000000000000000000000e16359506c028e51f16be38986ec5746251e9724",
+				},
+				"latest",
+			),
 		).resolves.toBeDefined();
 	});
 

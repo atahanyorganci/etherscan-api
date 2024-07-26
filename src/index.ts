@@ -2,50 +2,48 @@ import { ofetch } from "ofetch";
 import type { Storage } from "unstorage";
 import { z } from "zod";
 import {
+	BeaconChainWithdrawal,
 	Erc20Transfer,
 	Erc721Transfer,
 	Erc1155Transfer,
 	GetBalancesParams,
-	GetTokenTransfersParams,
-	ValidatedBlock,
 	GetBalancesResponse,
-	Transaction,
+	GetTokenTransfersParams,
+	GetValidatedBlockOptions,
 	InternalTransaction,
 	InternalTransactionsOfTransaction,
-	GetValidatedBlockOptions,
-	BeaconChainWithdrawal,
+	Transaction,
+	ValidatedBlock,
 } from "./account";
+import { BlockAndUncleRewards, ClosestOption, EstimatedTimeToBlockNumber } from "./block";
+import {
+	AbiItem,
+	AbiStr,
+	ContractCreation,
+	ContractSourceCodeResponse,
+	GetContractCreationParams,
+} from "./contract";
 import {
 	Address,
-	Wei,
 	type BlockIdentifier,
 	Ether,
 	HexString,
 	HexValue,
 	Integer,
-	serializeBlockIdentifier,
+	Wei,
+	ensureBlockIdentifier,
 } from "./core";
+import { GasOracleResponse } from "./gas-tracker";
 import {
-	AbiStr,
-	AbiItem,
-	ContractSourceCodeResponse,
-	GetContractCreationInput,
-	ContractCreation,
-} from "./contract";
-import { ContractExecutionStatus, TransactionReceiptStatus } from "./transaction";
-import { BlockAndUncleRewards, ClosestOption, EstimatedTimeToBlockNo } from "./block";
-import { Log, GetLogsInput } from "./logs";
-import {
-	UncleBlock,
-	TransactionReceipt,
-	CallParams,
-	EipTransaction,
 	Block,
 	BlockWithTransactions,
-	GetTransactionInput,
+	CallParams,
+	EipTransaction,
+	GetTransactionParams,
+	TransactionReceipt,
+	UncleBlock,
 } from "./json-rpc";
-import { GetErc20BalanceParams } from "./token";
-import { GasOracleResponse } from "./gas-tracker";
+import { GetLogsParams, Log } from "./logs";
 import {
 	Ether2Supply,
 	EtherPriceResponse,
@@ -53,6 +51,8 @@ import {
 	GetEthereumNodesSizeResponse,
 	NodeCountResponse,
 } from "./stats";
+import { GetErc20BalanceParams } from "./token";
+import { ContractExecutionStatus, TransactionReceiptStatus } from "./transaction";
 
 type Primitive = boolean | string | number | undefined | null;
 
@@ -267,15 +267,15 @@ export class Client {
 	/**
 	 * Returns the list of ERC-20 tokens transferred by an address, with optional filtering by token contract.
 	 *
-	 * @param input specify `address` for filter based on account, specify `contractAddress` to filter by
+	 * @param params specify `address` for filter based on account, specify `contractAddress` to filter by
 	 * ERC20 token, specify both to filter by account and ERC20 token
 	 * @param options pagination options {@link PaginationOptions `PaginationOptions`}
 	 * @returns array of {@link Erc20Transfer `Erc20Transfer`}s
 	 *
 	 * @see {@link https://docs.etherscan.io/api-endpoints/accounts#get-a-list-of-erc20-token-transfer-events-by-address | Etherscan API docs}
 	 */
-	async getErc20Transfers(input: GetTokenTransfersParams, options: PaginationOptions = {}) {
-		const { address, contractAddress } = GetTokenTransfersParams.parse(input);
+	async getErc20Transfers(params: GetTokenTransfersParams, options: PaginationOptions = {}) {
+		const { address, contractAddress } = GetTokenTransfersParams.parse(params);
 		const result = await this.callApi({
 			module: "account",
 			action: "tokentx",
@@ -289,15 +289,15 @@ export class Client {
 	/**
 	 * Returns the list of ERC-721 tokens transferred by an address, with optional filtering by token contract.
 	 *
-	 * @param input specify `address` for filter based on account, specify `contractAddress` to filter by
+	 * @param params specify `address` for filter based on account, specify `contractAddress` to filter by
 	 * ERC721 token, specify both to filter by account and ERC721 token
 	 * @param options pagination options {@link PaginationOptions `PaginationOptions`}
 	 * @returns array of {@link Erc721Transfer `Erc721Transfer`}s
 	 *
 	 * @see {@link https://docs.etherscan.io/api-endpoints/accounts#get-a-list-of-erc721-token-transfer-events-by-address | Etherscan API docs}
 	 */
-	async getErc721Transfers(input: GetTokenTransfersParams, options: PaginationOptions = {}) {
-		const { address, contractAddress } = GetTokenTransfersParams.parse(input);
+	async getErc721Transfers(params: GetTokenTransfersParams, options: PaginationOptions = {}) {
+		const { address, contractAddress } = GetTokenTransfersParams.parse(params);
 		const result = await this.callApi({
 			module: "account",
 			action: "tokennfttx",
@@ -311,15 +311,15 @@ export class Client {
 	/**
 	 * Returns the list of ERC-1155 tokens transferred by an address, with optional filtering by token contract.
 	 *
-	 * @param input specify `address` for filter based on account, specify `contractAddress` to filter by
+	 * @param params specify `address` for filter based on account, specify `contractAddress` to filter by
 	 * ERC1155 token, specify both to filter by account and ERC1155 token
 	 * @param options pagination options {@link PaginationOptions `PaginationOptions`}
 	 * @returns list of {@link Erc1155Transfer `Erc1155Transfer`}s
 	 *
 	 * @see {@link https://docs.etherscan.io/api-endpoints/accounts#get-a-list-of-erc1155-token-transfer-events-by-address | Etherscan API docs}
 	 */
-	async getErc1155Transfers(input: GetTokenTransfersParams, options: PaginationOptions = {}) {
-		const { address, contractAddress } = GetTokenTransfersParams.parse(input);
+	async getErc1155Transfers(params: GetTokenTransfersParams, options: PaginationOptions = {}) {
+		const { address, contractAddress } = GetTokenTransfersParams.parse(params);
 		const result = await this.callApi({
 			module: "account",
 			action: "token1155tx",
@@ -415,7 +415,7 @@ export class Client {
 	 * @see {@link https://docs.etherscan.io/api-endpoints/contracts#get-contract-creator-and-creation-tx-hash Etherscan API docs}
 	 */
 	async getContractCreation(addresses: string[]) {
-		const contractAddresses = GetContractCreationInput.parse(addresses).join(",");
+		const contractAddresses = GetContractCreationParams.parse(addresses).join(",");
 		const response = await this.callApi({
 			module: "contract",
 			action: "getcontractcreation",
@@ -432,7 +432,7 @@ export class Client {
 	 *
 	 * @see {@link https://docs.etherscan.io/api-endpoints/stats#check-contract-execution-status Etherscan API docs}
 	 */
-	async checkTransactionStatus(hash: string) {
+	async getTransactionStatus(hash: string) {
 		const response = await this.callApi({
 			module: "transaction",
 			action: "getstatus",
@@ -449,7 +449,7 @@ export class Client {
 	 *
 	 * @see {@link https://docs.etherscan.io/api-endpoints/stats#check-transaction-receipt-status Etherscan API docs}
 	 */
-	async checkTransactionReceiptStatus(hash: string) {
+	async getTransactionReceiptStatus(hash: string) {
 		const response = await this.callApi({
 			module: "transaction",
 			action: "gettxreceiptstatus",
@@ -478,7 +478,7 @@ export class Client {
 	 * Returns the estimated time remaining, in seconds, until a certain block is mined.
 	 *
 	 * @param blockNumber block number to estimate time remaining to be mined
-	 * @returns `EstimatedTimeToBlockNo`
+	 * @returns `EstimatedTimeToBlockNumber`
 	 *
 	 * @see {@link https://docs.etherscan.io/api-endpoints/blocks#get-estimated-block-countdown-time-by-blockno Etherscan API docs}
 	 */
@@ -488,7 +488,7 @@ export class Client {
 			action: "getblockcountdown",
 			blockno: Integer.min(0).parse(blockNumber),
 		});
-		return EstimatedTimeToBlockNo.parse(response);
+		return EstimatedTimeToBlockNumber.parse(response);
 	}
 
 	/**
@@ -500,12 +500,12 @@ export class Client {
 	 *
 	 * @see {@link  https://docs.etherscan.io/api-endpoints/blocks#get-estimated-block-countdown-time-by-blockno Etherscan API docs}
 	 */
-	async getBlockNoByTimestamp(timestamp: number, closest?: ClosestOption) {
+	async getBlockNumberByTimestamp(timestamp: number, closest: ClosestOption) {
 		const response = await this.callApi({
 			module: "block",
 			action: "getblocknobytime",
 			timestamp: Integer.min(0).parse(timestamp),
-			closest: ClosestOption.optional().parse(closest),
+			closest: ClosestOption.parse(closest),
 		});
 		return Integer.parse(response);
 	}
@@ -513,17 +513,17 @@ export class Client {
 	/**
 	 * Returns the event logs from an address, with optional filtering by block range.
 	 *
-	 * @param input `GetLogInput` object describing event filter
-	 * @param options `LogPaginationOptions`
+	 * @param params {@link GetLogsParams `GetLogsParams`} object describing event filter
+	 * @param options {@link LogPaginationOptions `LogPaginationOptions`}
 	 * @returns array of {@link Log `Log`} objects
 	 *
 	 * @see {@link https://docs.etherscan.io/api-endpoints/logs Etherscan API docs}
 	 */
-	async getLogs(input: GetLogsInput, options: LogPaginationOptions = {}) {
+	async getLogs(params: GetLogsParams, options: LogPaginationOptions = {}) {
 		const response = await this.callApi({
 			module: "logs",
 			action: "getLogs",
-			...GetLogsInput.parse(input),
+			...GetLogsParams.parse(params),
 			...LogPaginationOptions.parse(options),
 		});
 		return z.array(Log).parse(response);
@@ -532,6 +532,8 @@ export class Client {
 	/**
 	 * Returns the number of most recent block
 	 * @returns block number
+	 *
+	 * @see {@link https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_blocknumber `eth_getBlockByNumber`} documentation
 	 */
 	async getBlockNumber() {
 		const response = await this.callJsonRpc({
@@ -542,15 +544,16 @@ export class Client {
 
 	/**
 	 * Returns information about a block by block number.
-	 *
 	 * @param block block number or tag
 	 * @returns `Block` object
+	 *
+	 * @see {@link https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_getblockbynumber `eth_getBlockByNumber`} documentation
 	 */
 	async getBlock(block: BlockIdentifier) {
 		const response = await this.callJsonRpc({
 			module: "proxy",
 			action: "eth_getBlockByNumber",
-			tag: serializeBlockIdentifier(block),
+			tag: ensureBlockIdentifier(block),
 			boolean: "false",
 		});
 		return Block.parse(response);
@@ -560,13 +563,15 @@ export class Client {
 	 * Returns information about a block by block number.
 	 *
 	 * @param block block number or tag
-	 * @returns `Block` object
+	 * @returns `BlockWithTransactions` object
+	 *
+	 * @see {@link https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_getblockbynumber `eth_getBlockByNumber`} documentation
 	 */
 	async getBlockWithTransactions(block: BlockIdentifier) {
 		const response = await this.callJsonRpc({
 			module: "proxy",
 			action: "eth_getBlockByNumber",
-			tag: serializeBlockIdentifier(block),
+			tag: ensureBlockIdentifier(block),
 			boolean: "true",
 		});
 		return BlockWithTransactions.parse(response);
@@ -577,13 +582,15 @@ export class Client {
 	 *
 	 * @param block block number or tag
 	 * @returns `UncleBlock` object
+	 *
+	 * @see {@link https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_getunclebyblocknumberandindex `eth_getUncleByBlockNumberAndIndex`} documentation
 	 */
 	async getUncleBlock(block: BlockIdentifier, index: number) {
 		const idx = Integer.min(0).parse(index);
 		const response = await this.callJsonRpc({
 			module: "proxy",
 			action: "eth_getUncleByBlockNumberAndIndex",
-			tag: serializeBlockIdentifier(block),
+			tag: ensureBlockIdentifier(block),
 			index: `0x${idx.toString(16)}`,
 		});
 		return UncleBlock.parse(response);
@@ -594,12 +601,14 @@ export class Client {
 	 *
 	 * @param block block number or tag
 	 * @returns number of transactions
+	 *
+	 * @see {@link https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_getblocktransactioncountbynumber `eth_getBlockTransactionCountByNumber`} documentation
 	 */
-	async getTransactionCountByBlock(block: BlockIdentifier) {
+	async getBlockTransactionCount(block: BlockIdentifier) {
 		const response = await this.callJsonRpc({
 			module: "proxy",
 			action: "eth_getBlockTransactionCountByNumber",
-			tag: serializeBlockIdentifier(block),
+			tag: ensureBlockIdentifier(block),
 		});
 		return Integer.parse(response);
 	}
@@ -609,22 +618,25 @@ export class Client {
 	 *
 	 * @param block block number or tag
 	 * @returns number of transactions
+	 *
+	 * @see {@link https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_gettransactionbyhash `eth_getTransactionByHash`} documentation
+	 * @see {@link https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_gettransactionbyblocknumberandindex `eth_getTransactionByBlockNumberAndIndex`} documentation
 	 */
-	async getTransaction(input_: GetTransactionInput) {
-		const input = GetTransactionInput.parse(input_);
-		if ("hash" in input) {
+	async getTransaction(params: GetTransactionParams) {
+		const txParams = GetTransactionParams.parse(params);
+		if ("hash" in txParams) {
 			const response = await this.callJsonRpc({
 				module: "proxy",
 				action: "eth_getTransactionByHash",
-				txhash: input.hash,
+				txhash: txParams.hash,
 			});
 			return EipTransaction.parse(response);
 		}
 		const response = await this.callJsonRpc({
 			module: "proxy",
 			action: "eth_getTransactionByBlockNumberAndIndex",
-			tag: typeof input.block === "string" ? input.block : `0x${input.block.toString(16)}`,
-			index: `0x${input.index.toString(16)}`,
+			tag: ensureBlockIdentifier(txParams.block),
+			index: `0x${txParams.index.toString(16)}`,
 		});
 		return EipTransaction.parse(response);
 	}
@@ -635,8 +647,10 @@ export class Client {
 	 * @param address address to get transaction count
 	 * @param tag  pre-defined block parameter, either `"earliest"`, `"pending"` or `"latest"`
 	 * @returns number of transactions
+	 *
+	 * @see {@link https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_gettransactioncount `eth_getTransactionCount`} documentation
 	 */
-	async getTransactionCountByAddress(address: string, tag?: Tag) {
+	async getAccountTransactionCount(address: string, tag?: Tag) {
 		const response = await this.callJsonRpc({
 			module: "proxy",
 			action: "eth_getTransactionCount",
@@ -651,6 +665,8 @@ export class Client {
 	 *
 	 * @param txHash hash of the transaction
 	 * @returns `TransactionReceipt`
+	 *
+	 * @see {@link https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_gettransactionreceipt `eth_getTransactionReceipt`} documentation
 	 */
 	async getTransactionReceipt(txHash: string) {
 		const response = await this.callJsonRpc({
@@ -664,20 +680,22 @@ export class Client {
 	/**
 	 * Executes a new message call immediately without creating a transaction on the block chain.
 	 *
-	 * @param input `CallParams` object
+	 * @param params `CallParams` object
 	 * @param tag  pre-defined block parameter, either `"earliest"`, `"pending"` or `"latest"`
 	 * @returns result of the call in hex
+	 *
+	 * @see {@link https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_call `eth_call`} documentation
 	 */
-	async call(input: CallParams, tag?: Tag) {
-		const { value, gas, gasPrice, ...params } = CallParams.parse(input);
+	async call(params: CallParams, tag?: Tag) {
+		const { value, gas, gasPrice, ...rest } = CallParams.parse(params);
 		const response = await this.callJsonRpc({
 			module: "proxy",
 			action: "eth_call",
 			value: value ? `0x${value.toString(16)}` : undefined,
 			gas: gas ? `0x${gas.toString(16)}` : undefined,
 			gasPrice: gasPrice ? `0x${gasPrice.toString(16)}` : undefined,
-			...params,
 			tag: Tag.default("latest").parse(tag),
+			...rest,
 		});
 		return HexValue.parse(response);
 	}
@@ -688,6 +706,8 @@ export class Client {
 	 * @param address address to get code
 	 * @param tag  pre-defined block parameter, either `"earliest"`, `"pending"` or `"latest"`
 	 * @returns bytecode at address
+	 *
+	 * @see {@link https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_getcode `eth_getCode`} documentation
 	 */
 	async getCode(address: string, tag?: Tag) {
 		const response = await this.callJsonRpc({
@@ -703,6 +723,8 @@ export class Client {
 	 * Returns the current price per gas in wei.
 	 *
 	 * @returns gas price in wei
+	 *
+	 * @see {@link https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_gasprice `eth_gasPrice`} documentation
 	 */
 	async getGasPrice() {
 		const response = await this.callJsonRpc({
@@ -717,12 +739,14 @@ export class Client {
 	 *
 	 * @param callParams `EstimateGasParams` object
 	 * @returns gas used
+	 *
+	 * @see {@link https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_estimategas `eth_estimateGas`} documentation
 	 */
 	async estimateGas(callParams: CallParams) {
 		const { value, gas, gasPrice, ...params } = CallParams.parse(callParams);
 		const response = await this.callJsonRpc({
 			module: "proxy",
-			action: "eth_call",
+			action: "eth_estimateGas",
 			value: value ? `0x${value.toString(16)}` : undefined,
 			gas: gas ? `0x${gas.toString(16)}` : undefined,
 			gasPrice: gasPrice ? `0x${gasPrice.toString(16)}` : undefined,
@@ -736,6 +760,8 @@ export class Client {
 	 *
 	 * @param contractAddress contract address
 	 * @returns total supply of the ERC20 token
+	 *
+	 * @see {@link https://docs.etherscan.io/api-endpoints/tokens#get-erc20-token-totalsupply-by-contractaddress | Etherscan API docs}
 	 */
 	async getErc20TokenSupply(contractAddress: string) {
 		const response = await this.callApi({
@@ -907,7 +933,7 @@ export class Client {
 		const response = await this.fetch(params);
 		const apiResponse = Response.parse(response);
 		if (apiResponse.status === "0") {
-			throw new Error(apiResponse.result);
+			throw new Error(apiResponse.message);
 		}
 		return apiResponse.result;
 	}
