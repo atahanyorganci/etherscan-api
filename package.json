@@ -33,6 +33,7 @@
 	"types": "./dist/index.d.ts",
 	"files": ["dist"],
 	"scripts": {
+		"attw": "attw --pack . --ignore-rules no-resolution",
 		"build": "unbuild",
 		"check": "tsc",
 		"check:watch": "tsc --watch",
@@ -52,6 +53,7 @@
 		"zod": "^3.21.4"
 	},
 	"devDependencies": {
+		"@arethetypeswrong/cli": "^0.15.3",
 		"@biomejs/biome": "^1.8.3",
 		"@types/node": "^20.14.12",
 		"@vitest/coverage-v8": "^2.0.4",
