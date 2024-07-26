@@ -27,7 +27,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: "pnpm"
@@ -37,5 +37,4 @@ jobs:
         uses: extractions/setup-just@v1
       - name: Run CI using just
         shell: bash
-        run: |
-          just ci
+        run: just ci
