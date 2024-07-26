@@ -1,16 +1,7 @@
-import fs from "unstorage/drivers/fs-lite";
 import { expect, test } from "vitest";
-import { Client } from ".";
-import { createCache } from "./cache";
+import getTestClient from "./fixtures/client";
 
-const client = new Client({
-	apiKey: process.env.VITE_ETHERSCAN_API_KEY,
-	cache: createCache({
-		driver: fs({
-			base: "cache",
-		}),
-	}),
-});
+const client = getTestClient();
 
 test("Get Block And Uncle Rewards by BlockNo", async () => {
 	await expect(client.getBlockAndUncleRewardsByBlockNumber(2165403)).resolves.toMatchObject({

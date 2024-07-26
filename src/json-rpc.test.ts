@@ -1,16 +1,7 @@
-import fs from "unstorage/drivers/fs-lite";
 import { describe, expect, test } from "vitest";
-import { Client } from ".";
-import { createCache } from "./cache";
+import getTestClient from "./fixtures/client";
 
-const client = new Client({
-	apiKey: process.env.VITE_ETHERSCAN_API_KEY,
-	cache: createCache({
-		driver: fs({
-			base: "cache",
-		}),
-	}),
-});
+const client = getTestClient();
 
 describe("JSON-RPC API", () => {
 	test("eth_blockNumber", async () => {

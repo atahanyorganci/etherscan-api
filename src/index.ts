@@ -97,8 +97,6 @@ import {
 import { GetErc20BalanceParams } from "./token";
 import { ContractExecutionStatus, TransactionReceiptStatus } from "./transaction";
 
-type Primitive = boolean | string | number | undefined | null;
-
 const SuccessResponse = z.object({
 	status: z.literal("1"),
 	message: z.string(),
@@ -114,7 +112,9 @@ const ErrorResponse = z.object({
 const Response = z.discriminatedUnion("status", [SuccessResponse, ErrorResponse]);
 type Response = z.infer<typeof Response>;
 
-type EndpointParams = { module: string; action: string } & Record<string, Primitive>;
+export type Primitive = boolean | string | number | undefined | null;
+export type Params = { module: string } & Record<string, Primitive>;
+export type EndpointParams = Params & { action: string };
 
 /**
  * - `startBlock` - block number to start searching for transactions
@@ -184,7 +184,7 @@ export type Tag = z.infer<typeof Tag>;
  */
 export interface Cache {
 	// Function to use when serializing request URL and headers.
-	serialize: (object: unknown) => string;
+	serialize: (object: Params) => string;
 	/**
 	 * `Storage` instance from {@link https://unstorage.unjs.io/guide | `unstorage`} used for
 	 * persisting resources.
@@ -942,7 +942,7 @@ export class Client {
 		return NodeCountResponse.parse(response);
 	}
 
-	private async fetch(params: Record<string, Primitive>): Promise<unknown> {
+	private async fetch(params: Params): Promise<unknown> {
 		const url = this.encodeQueryParams(params);
 		if (!this.cache) {
 			return await ofetch(url);
@@ -957,7 +957,7 @@ export class Client {
 		return response;
 	}
 
-	private encodeQueryParams(params: Record<string, Primitive>): URL {
+	private encodeQueryParams(params: Params): URL {
 		const url = new URL(this.apiUrl);
 		if (this.apiKey) {
 			url.searchParams.set("apikey", this.apiKey);
@@ -980,7 +980,7 @@ export class Client {
 		return apiResponse.result;
 	}
 
-	private async callJsonRpc(params: Omit<EndpointParams, "module">): Promise<unknown> {
+	private async callJsonRpc(params: Omit<Params, "module">): Promise<unknown> {
 		const response = await this.fetch({
 			module: "proxy",
 			...params,

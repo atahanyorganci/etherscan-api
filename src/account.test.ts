@@ -1,17 +1,7 @@
-import fs from "unstorage/drivers/fs-lite";
 import { expect, test } from "vitest";
-import { Client } from ".";
-import { createCache } from "./cache";
+import getTestClient from "./fixtures/client";
 
-const client = new Client({
-	apiKey: process.env.VITE_ETHERSCAN_API_KEY,
-	cache: createCache({
-		driver: fs({
-			base: "cache",
-		}),
-	}),
-});
-
+const client = getTestClient();
 const OLD_ADDRESS = "0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae";
 const NEW_ADDRESS = "0x6B182919cAAaC95272c45bfC61ec418d0E301140";
 

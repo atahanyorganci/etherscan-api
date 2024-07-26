@@ -1,16 +1,7 @@
-import fs from "unstorage/drivers/fs-lite";
 import { expect, test } from "vitest";
-import { Client } from ".";
-import { createCache } from "./cache";
+import getTestClient from "./fixtures/client";
 
-const client = new Client({
-	apiKey: process.env.VITE_ETHERSCAN_API_KEY,
-	cache: createCache({
-		driver: fs({
-			base: "cache",
-		}),
-	}),
-});
+const client = getTestClient();
 
 test("Get Contract ABI for Verified Contract Source Codes", async () => {
 	await expect(client.getAbi("0xBB9bc244D798123fDe783fCc1C72d3Bb8C189413")).resolves.toBeDefined();
