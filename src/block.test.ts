@@ -12,7 +12,7 @@ const client = new Client({
 	}),
 });
 
-test("get-block-and-uncle-rewards-by-block-number", async () => {
+test("Get Block And Uncle Rewards by BlockNo", async () => {
 	await expect(client.getBlockAndUncleRewardsByBlockNumber(2165403)).resolves.toStrictEqual({
 		blockNumber: 2165403,
 		timeStamp: 1472533979,
@@ -34,11 +34,11 @@ test("get-block-and-uncle-rewards-by-block-number", async () => {
 	});
 });
 
-test("get-estimated-block-countdown-time-by-block-number", async () => {
+test("Get Estimated Block Countdown Time by BlockNo", async () => {
 	const current = await client.getBlockNumber();
 	await expect(client.getEstimatedTimeToBlockNumber(current + 1_000)).resolves.toBeDefined();
 });
 
-test.todo("get-closest-block-number-by-timestamp", async () => {
+test("Get Block Number by Timestamp", async () => {
 	await expect(client.getBlockNoByTimestamp(1721899160)).resolves.toBeDefined();
 });

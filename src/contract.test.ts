@@ -12,7 +12,7 @@ const client = new Client({
 	}),
 });
 
-test("get-abi", async () => {
+test("Get Contract ABI for Verified Contract Source Codes", async () => {
 	await expect(client.getAbi("0xBB9bc244D798123fDe783fCc1C72d3Bb8C189413")).resolves.toBeDefined();
 	await expect(client.getAbi("0x92BeEb23B09Bb1309545B56072f4A8AcEe6C280B")).resolves.toBeDefined();
 	await expect(client.getAbi("0xA59d94ec9F1ecf6C705FB8cE9765fF7801cd52C4")).resolves.toBeDefined();
@@ -24,9 +24,10 @@ test("get-abi", async () => {
 	await expect(client.getAbi("0x9221A6E16e3576d2EFd3Aa4Bd635C15A752c19f7")).resolves.toBeDefined();
 	await expect(client.getAbi("0xb2329f36b75Cd63f73d26888580A8af0D1dCbDF4")).resolves.toBeDefined();
 	await expect(client.getAbi("0x5f1BF628Ae19dfeCb0FB9a2Ac0Ed5a33B8279090")).resolves.toBeDefined();
+	await expect(client.getAbi("0x6D794AE701F9e4A290a843f66005233a98f2154B")).resolves.toBeDefined();
 });
 
-test("get-source-code", async () => {
+test("Get Contract Source Code for Verified Contract Source Codes", async () => {
 	await expect(
 		client.getSourceCode("0xBB9bc244D798123fDe783fCc1C72d3Bb8C189413"),
 	).resolves.toBeDefined();
@@ -65,7 +66,7 @@ test("get-source-code", async () => {
 	).resolves.toBeDefined();
 });
 
-test("get-contact-creator-and-creation-tx", async () => {
+test("Get Contract Creator and Creation Tx Hash", async () => {
 	const CONTRACTS = [
 		"0xB83c27805aAcA5C7082eB45C868d955Cf04C337F",
 		"0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",

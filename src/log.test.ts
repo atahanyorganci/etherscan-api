@@ -12,7 +12,7 @@ const client = new Client({
 	}),
 });
 
-test("get-logs", async () => {
+test("Get Event Logs by Address", async () => {
 	await expect(
 		client.getLogs(
 			{

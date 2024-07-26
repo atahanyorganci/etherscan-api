@@ -12,10 +12,10 @@ const client = new Client({
 	}),
 });
 
-test("get-estimated-confirmation-time", async () => {
+test("Get Estimation of Confirmation Time", async () => {
 	await expect(client.getEstimatedConfirmationTime(2000000000n)).resolves.toBeDefined();
 });
 
-test("get-gas-oracle", async () => {
+test("Get Gas Oracle", async () => {
 	await expect(client.getGasOracle()).resolves.toBeDefined();
 });

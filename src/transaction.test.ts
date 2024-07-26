@@ -12,7 +12,7 @@ const client = new Client({
 	}),
 });
 
-test("check-contract-execution-status", async () => {
+test("Check Contract Execution Status", async () => {
 	await expect(
 		client.checkTransactionStatus(
 			"0x15f8e5ea1079d9a0bb04a4c58ae5fe7654b5b2b4463375ff7ffb490aa0032f3a",
@@ -30,7 +30,7 @@ test("check-contract-execution-status", async () => {
 	});
 });
 
-test("check-contract-receipt-status", async () => {
+test("Check Transaction Receipt Status", async () => {
 	await expect(
 		client.checkTransactionReceiptStatus(
 			"0x513c1ba0bebf66436b5fed86ab668452b7805593c05073eb2d51d3a52f480a76",
