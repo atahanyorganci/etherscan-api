@@ -1,7 +1,19 @@
 {
-	"name": "better-scan",
-	"version": "0.1.0",
-	"private": true,
+	"name": "@yorganci/etherscan-api",
+	"version": "0.0.0",
+	"description": "Etherscan API client for Node.js and the browser with zod validation and caching.",
+	"license": "MIT",
+	"author": {
+		"name": "Atahan Yorganci",
+		"url": "https://github.com/atahanyorganci"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/atahanyorganci/etherscan-api.git"
+	},
+	"bugs": {
+		"url": "https://github.com/atahanyorganci/etherscan-api/issues"
+	},
 	"scripts": {
 		"check:lib": "tsc -p tsconfig.lib.json",
 		"check:lib:watch": "tsc -p tsconfig.lib.json --watch",
@@ -27,6 +39,7 @@
 	"devDependencies": {
 		"@biomejs/biome": "^1.8.3",
 		"@types/node": "^20.14.12",
+		"@vitest/coverage-v8": "^2.0.4",
 		"concurrently": "^8.2.2",
 		"tsup": "^8.2.3",
 		"typescript": "^5.5.4",
