@@ -15,12 +15,8 @@
 		"url": "https://github.com/atahanyorganci/etherscan-api/issues"
 	},
 	"scripts": {
-		"check:lib": "tsc -p tsconfig.lib.json",
-		"check:lib:watch": "tsc -p tsconfig.lib.json --watch",
-		"check:test": "tsc -p tsconfig.test.json",
-		"check:test:watch": "tsc -p tsconfig.test.json --watch",
-		"check": "concurrently npm:check:lib npm:check:test",
-		"check:watch": "concurrently npm:check:*:watch",
+		"check": "tsc",
+		"check:watch": "tsc --watch",
 		"format": "biome format .",
 		"format:write": "biome format --write .",
 		"lint": "biome check .",
@@ -40,7 +36,6 @@
 		"@biomejs/biome": "^1.8.3",
 		"@types/node": "^20.14.12",
 		"@vitest/coverage-v8": "^2.0.4",
-		"concurrently": "^8.2.2",
 		"tsup": "^8.2.3",
 		"typescript": "^5.5.4",
 		"vitest": "^2.0.4"

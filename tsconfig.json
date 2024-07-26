@@ -1,11 +1,39 @@
 {
-	"files": [],
-	"references": [
-		{
-			"path": "./tsconfig.lib.json"
+	"compilerOptions": {
+		// TypeChecking
+		"allowUnreachableCode": false,
+		"allowUnusedLabels": false,
+		"noFallthroughCasesInSwitch": true,
+		"noImplicitOverride": true,
+		"noImplicitReturns": true,
+		"noImplicitThis": true,
+		"noUncheckedIndexedAccess": true,
+		"noUnusedLocals": true,
+		"noUnusedParameters": true,
+		"strict": true,
+		"useUnknownInCatchVariables": true,
+		// Modules
+		"baseUrl": ".",
+		"module": "Preserve",
+		"moduleResolution": "Bundler",
+		"paths": {
+			"~/*": ["./src/*"]
 		},
-		{
-			"path": "./tsconfig.test.json"
-		}
-	]
+		"resolveJsonModule": true,
+		// Emit
+		"noEmit": true,
+		// Interop Constraints
+		"allowSyntheticDefaultImports": true,
+		"esModuleInterop": true,
+		"isolatedModules": true,
+		"verbatimModuleSyntax": true,
+		// Language and Environment
+		"lib": ["ESNext"],
+		"moduleDetection": "force",
+		"target": "ESNext",
+		// Completeness
+		"skipLibCheck": true
+	},
+	"include": ["src/**/*.ts"],
+	"exclude": ["node_modules"]
 }
