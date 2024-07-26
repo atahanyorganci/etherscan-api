@@ -11,11 +11,15 @@ vi.mock("ofetch", async importOriginal => {
 	};
 });
 
+interface TestClient {
+	fetch: (params: Record<string, string>) => Promise<unknown>;
+}
+
 test("fetchData", async () => {
 	const cache = createCache();
 	const client = new Client({
 		cache,
-	});
+	}) as unknown as TestClient;
 	expect(cache.storage.getKeys()).resolves.toHaveLength(0);
 	expect(await client.fetch({ module: "test" })).toMatchInlineSnapshot(`
 		{
