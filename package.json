@@ -14,7 +14,26 @@
 	"bugs": {
 		"url": "https://github.com/atahanyorganci/etherscan-api/issues"
 	},
+	"sideEffects": false,
+	"type": "module",
+	"exports": {
+		".": {
+			"import": "./dist/index.mjs",
+			"require": "./dist/index.cjs",
+			"types": "./dist/index.d.ts"
+		},
+		"./cache": {
+			"import": "./dist/cache/index.mjs",
+			"require": "./dist/cache/index.cjs",
+			"types": "./dist/cache/index.d.ts"
+		},
+		"./package.json": "./package.json"
+	},
+	"main": "./dist/index.cjs",
+	"types": "./dist/index.d.ts",
+	"files": ["dist"],
 	"scripts": {
+		"build": "unbuild",
 		"check": "tsc",
 		"check:watch": "tsc --watch",
 		"format": "biome format .",
@@ -36,8 +55,8 @@
 		"@biomejs/biome": "^1.8.3",
 		"@types/node": "^20.14.12",
 		"@vitest/coverage-v8": "^2.0.4",
-		"tsup": "^8.2.3",
 		"typescript": "^5.5.4",
+		"unbuild": "^2.0.0",
 		"vitest": "^2.0.4"
 	}
 }
