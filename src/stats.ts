@@ -75,3 +75,4 @@ export const NodeCountResponse = z
 		timestamp,
 		count,
 	}));
+export type NodeCountResponse = z.infer<typeof NodeCountResponse>;

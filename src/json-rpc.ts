@@ -143,6 +143,7 @@ export const Block = z
 		uncles: z.array(HexString),
 	})
 	.or(z.null());
+export type Block = z.infer<typeof Block>;
 
 export const BlockWithTransactions = z
 	.object({
@@ -168,6 +169,7 @@ export const BlockWithTransactions = z
 		uncles: z.array(HexString),
 	})
 	.or(z.null());
+export type BlockWithTransactions = z.infer<typeof BlockWithTransactions>;
 
 export const GetTransactionParams = z
 	.object({
@@ -240,7 +242,7 @@ export type TransactionReceipt = z.infer<typeof TransactionReceipt>;
 /**
  * Call parameters for the `eth_call` JSON-RPC method.
  *
- * @see {@link https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_call `eth_call`} documentation.
+ * @see {@link https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_call | `eth_call`} documentation.
  */
 export const CallParams = z.object({
 	from: Address.optional(),

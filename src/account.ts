@@ -12,12 +12,27 @@ import {
 	Wei,
 } from "./core";
 
+/**
+ * Up to 20 {@link (Address:variable) | `Address`} elements for balance fetching.
+ * @public
+ */
 export const GetBalancesParams = z.array(Address).max(20);
+/** @public */
 export type GetBalancesParams = z.infer<typeof GetBalancesParams>;
 
+/**
+ * Array containing {@link (Address:variable) | `address`} and `balance` pairs
+ * @public
+ */
 export const GetBalancesResponse = z.array(z.object({ account: Address, balance: Ether }));
+/** @public */
 export type GetBalancesResponse = z.infer<typeof GetBalancesResponse>;
 
+/**
+ * Transaction object returned by Etherscan. Note that this is different from transactions
+ * defined in EIP processes.
+ * @public
+ */
 export const Transaction = z
 	.object({
 		blockNumber: Integer,
@@ -42,8 +57,13 @@ export const Transaction = z
 		isError: EnumBoolean,
 	})
 	.transform(({ timeStamp: timestamp, ...rest }) => ({ timestamp, ...rest }));
+/** @public */
 export type Transaction = z.infer<typeof Transaction>;
 
+/**
+ * Internal transactions that aren't visible as standalone transactions.
+ * @public
+ */
 export const InternalTransaction = z
 	.object({
 		blockNumber: Integer,
@@ -62,8 +82,14 @@ export const InternalTransaction = z
 		errCode: OptionalString,
 	})
 	.transform(({ timeStamp: timestamp, ...rest }) => ({ timestamp, ...rest }));
+/** @public */
 export type InternalTransaction = z.infer<typeof InternalTransaction>;
 
+/**
+ * Internal transactions in a single transaction
+ * @see {@link (InternalTransaction:variable) | `InternalTransaction`}
+ * @public
+ */
 export const InternalTransactionsOfTransaction = z
 	.object({
 		blockNumber: Integer,
@@ -80,6 +106,7 @@ export const InternalTransactionsOfTransaction = z
 		errCode: OptionalString,
 	})
 	.transform(({ timeStamp: timestamp, ...rest }) => ({ timestamp, ...rest }));
+/** @public */
 export type InternalTransactionsOfTransaction = z.infer<typeof InternalTransactionsOfTransaction>;
 
 export const GetTokenTransfersParams = z.union([

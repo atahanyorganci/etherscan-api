@@ -92,6 +92,7 @@ export const AbiItem = z.discriminatedUnion("type", [
 	Event,
 	Error_,
 ]);
+export type AbiItem = z.infer<typeof AbiItem>;
 
 export const AbiStr = z
 	.string()
@@ -199,3 +200,4 @@ export const ContractCreation = z.object({
 	txHash: HexString,
 	contractCreator: Address,
 });
+export type ContractCreation = z.infer<typeof ContractCreation>;

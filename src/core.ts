@@ -17,6 +17,7 @@ export const Address = z.string().transform((value, ctx) => {
 		return z.NEVER;
 	}
 });
+export type Address = z.infer<typeof Address>;
 
 /**
  * Ether value with 18 decimal places represented as a string
@@ -24,6 +25,7 @@ export const Address = z.string().transform((value, ctx) => {
  * @example `"1.0"` is parsed as  `1000000000000000000n` wei
  */
 export const Ether = z.string().transform(ether => parseEther(ether));
+export type Ether = z.infer<typeof Ether>;
 
 /**
  * Optional string represented as an empty string `""` or a non-empty string
@@ -90,7 +92,7 @@ export type BlockTag = z.infer<typeof BlockTag>;
 export const BlockIdentifier = BlockTag.or(Integer.min(0));
 
 /**
- * Block identifier represented as a {@link BlockTag `BlockTag`} or a block number.
+ * Block identifier represented as a {@link BlockTag | `BlockTag`} or a block number.
  */
 export type BlockIdentifier = z.infer<typeof BlockIdentifier>;
 
