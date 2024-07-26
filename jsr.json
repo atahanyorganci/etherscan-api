@@ -1,0 +1,13 @@
+{
+	"$schema": "https://jsr.io/schema/config-file.v1.json",
+	"name": "@yorganci/etherscan-api",
+	"version": "0.0.0",
+	"exports": {
+		".": "./src/index.ts",
+		"./cache": "./src/cache/index.ts"
+	},
+	"publish": {
+		"include": ["LICENSE", "README.md", "src/**/*.ts"],
+		"exclude": ["src/**/*.test.ts", "src/fixtures/**/*.ts"]
+	}
+}
