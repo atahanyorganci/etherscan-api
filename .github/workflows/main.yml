@@ -33,15 +33,9 @@ jobs:
           cache: "pnpm"
       - name: Install dependencies
         run: pnpm install
-      - name: Format
-        run: pnpm run format
-      - name: Lint
-        run: pnpm run lint
-      - name: Check
-        run: pnpm run check
-      - name: Test
-        run: pnpm run test:ci
-      - name: Build
-        run: pnpm run build
-      - name: Are the types wrong
-        run: pnpm run attw
+      - name: Setup just
+        uses: extractions/setup-just@v1
+      - name: Run CI using just
+        shell: bash
+        run: |
+          just ci
