@@ -17,7 +17,7 @@ dist
 .env*.local
 
 # cache
-cache
+test/cache
 
 # logs
 *.log

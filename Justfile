@@ -1,5 +1,9 @@
-name := `jq -r '.name' package.json`
+name    := `jq -r '.name' package.json`
 version := `jq -r '.version' package.json`
+
+test_dir      := justfile_directory() / "test"
+cache_dir     := test_dir / "cache"
+cache_archive := "cache.tar.gz"
 
 format:
     bun run format
@@ -10,7 +14,7 @@ lint:
 check:
     bun run check
 
-test:
+test: decompress
     bun run test
 
 build:
@@ -19,7 +23,27 @@ build:
 attw:
     bun run attw
 
-@pre-publish: format lint check test build attw
+compress:
+    #!/usr/bin/env bash
+
+    cd {{ test_dir }}
+    tar -czvf cache.tar.gz cache
+    cd -
+
+decompress:
+    #!/usr/bin/env bash
+
+    if [ -d "{{ cache_dir }}" ]; then
+        exit 0
+    fi
+
+    cd {{ test_dir }}
+    tar -xzvf cache.tar.gz
+    cd -
+
+ci: format lint check test
+
+@pre-publish: ci build attw
     echo "Ready for publishing"
 
 [private]
